@@ -1,6 +1,20 @@
+from models.bigram import BigramLM
 from utils.training_utils import batchifier
 from utils.dataset_preparation import get_dataset
 import torch
+
+# hyperparameters
+
+# training
+block_size = (
+    16  # what is the maximum length of a sequence which influences the next token
+)
+batch_size = 4  # how many sequences we want to process in parallel
+lr = 1e-2  # learning rate
+train_split = 0.85  # ratio of training to validation in the training dataset
+epochs = 1000
+# CUDA support
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 def main():
@@ -8,12 +22,13 @@ def main():
     # Would have to encode all relationships between all characters in the dataset
     dataset = get_dataset()
     vocab = sorted(list(set(dataset)))
+    vocab_size = len(vocab)
 
     # cache the mapping from characters to integers and vice versa (mappings between vocabulary and integers)
     string_to_integer_map = {c: i for i, c in enumerate(vocab)}
     integer_to_string_map = {i: c for i, c in enumerate(vocab)}
 
-    # convert a string to a list of integers and vice versa
+    # convert a string to a list to numerical mappings  and vice versa
     encode = lambda s: [string_to_integer_map[c] for c in s]
     decode = lambda l: "".join([integer_to_string_map[i] for i in l])
 
@@ -21,19 +36,13 @@ def main():
     print(data.shape, data.dtype)
 
     # split the dataset into training and validation sets
-    train_size = int(0.85 * len(data))
+    train_size = int(train_split * len(data))
 
-    train_data = data[:train_size]
-    val_data = data[train_size:]
+    train_data = data[:train_size].to(device)
+    val_data = data[train_size:].to(device)
 
     print("Training data size:", train_data.shape)
     print("Validation data size:", val_data.shape)
-
-    # training
-    block_size = (
-        16  # what is the maximum length of a sequence which influences the next token
-    )
-    batch_size = 4  # how many sequences we want to process in parallel
 
     # this block contains more than simply 64 characters
     # encoded in the list of integers is the probability distribution of each  character\token appearing given the previous ones
@@ -52,12 +61,14 @@ def main():
     # this is because all we are doing is simply predicting the next character in the sequence - do this enough times on enough data and  generalization is approximated
 
     xb_train, yb_train = batchifier(
-        train_data, batch_size=batch_size, block_size=block_size
+        train_data, batch_size=batch_size, block_size=block_size, device=device
     )
     print("Train batch shape:", xb_train.shape, yb_train.shape)
     print("Train batch example:", xb_train[0], yb_train[0])
 
-    xb_val, yb_val = batchifier(val_data, batch_size=batch_size, block_size=block_size)
+    xb_val, yb_val = batchifier(
+        val_data, batch_size=batch_size, block_size=block_size, device=device
+    )
     # print("Validation batch shape:", xb_val.shape, yb_val.shape)
     # print("Validation batch example:", xb_val[0], yb_val[0])
 
@@ -74,6 +85,40 @@ def main():
     #         print(
     #             f"Batch {b}, Time {t}: Context: {context.tolist()}, Target: {target.item()}"
     #         )
+
+    # bigram test
+    model = BigramLM(vocab_size)
+    m = model.to(device)
+    logits, loss = m(xb_train, yb_train)
+    idx = torch.zeros((1, 1), dtype=torch.long)  # start at a space\empty
+    idx = idx.to(device)
+    # base validation
+    print(f"tensor dims: {logits.shape}")
+    print(f"loss original: {loss}")
+    print(
+        f"example output: {decode(m.generate(idx, max_new_tokens=100)[0].tolist())}"
+    )  # hack for bigram due to single batch dimension of the indicies
+
+    # lets train! :)
+    optimizer = torch.optim.AdamW(
+        m.parameters(), lr=lr
+    )  # 1e-3 default for this tiny thing, still very fast
+
+    for _ in range(epochs):
+        xb, yb = xb_train, yb_train
+
+        logits, loss = m(xb, yb)
+        optimizer.zero_grad(set_to_none=True)
+        loss.backward()
+        optimizer.step()
+
+    # observe improvement in loss and generation!
+    print(f"loss post-training: {loss}")
+    print(
+        f"example output: {decode(m.generate(idx, max_new_tokens=100)[0].tolist())}"
+    )  # hack for bigram due to single batch dimension of the indicies
+
+    # observe too the flat peak of the models capability - its time to move on to making use of the rest of the sequences
 
 
 if __name__ == "__main__":
