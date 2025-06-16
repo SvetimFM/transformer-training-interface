@@ -1,3 +1,4 @@
+from utils.training_utils import batchifier
 from utils.dataset_preparation import get_dataset
 import torch
 
@@ -21,10 +22,58 @@ def main():
 
     # split the dataset into training and validation sets
     train_size = int(0.85 * len(data))
+
     train_data = data[:train_size]
     val_data = data[train_size:]
+
     print("Training data size:", train_data.shape)
     print("Validation data size:", val_data.shape)
+
+    # training
+    block_size = (
+        16  # what is the maximum length of a sequence which influences the next token
+    )
+    batch_size = 4  # how many sequences we want to process in parallel
+
+    # this block contains more than simply 64 characters
+    # encoded in the list of integers is the probability distribution of each  character\token appearing given the previous ones
+    # this is the crux of attention - context of the next token given previous x tokens
+
+    # the transformer is limited on prediction of the next token based on the previous tokens in the block window - if it were infinite, that would be nice, but not scalable
+
+    # nice thing too - the chunks impose a limitation that allows parallelization of the training process - as individual chunks contain individual sequences of characters thus different probability distributions
+
+    # (what if we began predicting the next block based on previous blocks?)
+    # we would likely gain the same kind of benefit as we would by increasing chunk size in tokenizer
+
+    print(train_data[: block_size + 1])
+
+    # Notice that these are basically the same with an offset of 1
+    # this is because all we are doing is simply predicting the next character in the sequence - do this enough times on enough data and  generalization is approximated
+
+    xb_train, yb_train = batchifier(
+        train_data, batch_size=batch_size, block_size=block_size
+    )
+    print("Train batch shape:", xb_train.shape, yb_train.shape)
+    print("Train batch example:", xb_train[0], yb_train[0])
+
+    xb_val, yb_val = batchifier(val_data, batch_size=batch_size, block_size=block_size)
+    # print("Validation batch shape:", xb_val.shape, yb_val.shape)
+    # print("Validation batch example:", xb_val[0], yb_val[0])
+
+    print("training batch count:", xb_train.shape[0])
+    print("validation batch count:", xb_val.shape[0])
+
+    # Want to see the input\output pairs? uncomment the following lines
+    # for b in range(batch_size):  # parallelization dimension
+    #     for t in range(
+    #         block_size
+    #     ):  # sequence incrementation dimension (time dimension)
+    #         context = xb_train[b, : t + 1]
+    #         target = yb_train[b, t]
+    #         print(
+    #             f"Batch {b}, Time {t}: Context: {context.tolist()}, Target: {target.item()}"
+    #         )
 
 
 if __name__ == "__main__":
