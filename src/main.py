@@ -1,24 +1,30 @@
-from model_io.decoder import integer_to_string
-from model_io.encoder import string_to_integer
-from utils.dataset_preparation import prepare_dataset
-import tiktoken
+from utils.dataset_preparation import get_dataset
+import torch
 
 
 def main():
-    vocab = prepare_dataset()
-    print("encoded:", string_to_integer(vocab))
-    print("decoded:", integer_to_string(vocab))
+    # Basic encoder - character to integer. Very simple, and lossless encoding method - which does not scale well
+    # Would have to encode all relationships between all characters in the dataset
+    dataset = get_dataset()
+    vocab = sorted(list(set(dataset)))
 
-    test_sentence = "Hello, world!"
-    print(
-        f"Test sentence to integer: {test_sentence} is  {string_to_integer(test_sentence)}\n"
-    )
+    # cache the mapping from characters to integers and vice versa (mappings between vocabulary and integers)
+    string_to_integer_map = {c: i for i, c in enumerate(vocab)}
+    integer_to_string_map = {i: c for i, c in enumerate(vocab)}
 
-    # lossy, much more efficient encoding method is to have way more tokens for segments of words
-    encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")
-    print(
-        f"Test sentence to tiktoken for gpt-3.5-turbo encoding: {test_sentence} is  {encoding.encode(test_sentence)}\n"
-    )
+    # convert a string to a list of integers and vice versa
+    encode = lambda s: [string_to_integer_map[c] for c in s]
+    decode = lambda l: "".join([integer_to_string_map[i] for i in l])
+
+    data = torch.tensor(encode(dataset), dtype=torch.long)
+    print(data.shape, data.dtype)
+
+    # split the dataset into training and validation sets
+    train_size = int(0.85 * len(data))
+    train_data = data[:train_size]
+    val_data = data[train_size:]
+    print("Training data size:", train_data.shape)
+    print("Validation data size:", val_data.shape)
 
 
 if __name__ == "__main__":
