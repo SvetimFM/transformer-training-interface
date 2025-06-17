@@ -8,16 +8,22 @@ torch.manual_seed(1337)
 # Bigram Language Model
 # But what is happening here per tutorial is essentially we take our training data and use it to train a bigram model that just looks at N token to predict N+1 token
 
+n_embed = 32
+
 
 class BigramLM(nn.Module):
-    def __init__(self, vocab_size):
+    def __init__(self, vocab_size, block_size):
         super().__init__()
         self.vocab_size = vocab_size
-        self.token_embedding_table = nn.Embedding(vocab_size, vocab_size)
+        self.token_embedding_table = nn.Embedding(
+            vocab_size, n_embed
+        )  # n_embed is number of embedded dimensions
+        self.position_embedding_table = nn.Embedding(block_size, n_embed)
+        self.lm_head = nn.Linear(n_embed, vocab_size)
 
     def forward(self, idx, targets=None):
-        logits = self.token_embedding_table(idx)
-
+        token_embeddings = self.token_embedding_table(idx)  # (B, T, C)
+        logits = self.lm_head(token_embeddings)  # (B,T, vocab_size)
         # generation mode
         if targets is None:
             loss = None

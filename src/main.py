@@ -19,7 +19,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 def main():
     # Basic encoder - character to integer. Very simple, and lossless encoding method - which does not scale well
-    # Would have to encode all relationships between all characters in the dataset
+    # Would have to encode all relationships between all characters in the dataset - got RAM?
     dataset = get_dataset()
     vocab = sorted(list(set(dataset)))
     vocab_size = len(vocab)
@@ -46,7 +46,7 @@ def main():
 
     # this block contains more than simply 64 characters
     # encoded in the list of integers is the probability distribution of each  character\token appearing given the previous ones
-    # this is the crux of attention - context of the next token given previous x tokens
+    # this is the crux of attention - context of the next token given relationship with previous x tokens
 
     # the transformer is limited on prediction of the next token based on the previous tokens in the block window - if it were infinite, that would be nice, but not scalable
 
@@ -58,7 +58,7 @@ def main():
     print(train_data[: block_size + 1])
 
     # Notice that these are basically the same with an offset of 1
-    # this is because all we are doing is simply predicting the next character in the sequence - do this enough times on enough data and  generalization is approximated
+    # this is because all we are doing is simply predicting the next character in the sequence - do this enough times on enough data and generalization across a subset of  problem space in the dataset is approximated
 
     xb_train, yb_train = batchifier(
         train_data, batch_size=batch_size, block_size=block_size, device=device
@@ -87,7 +87,7 @@ def main():
     #         )
 
     # bigram test
-    model = BigramLM(vocab_size)
+    model = BigramLM(vocab_size, block_size)
     m = model.to(device)
     logits, loss = m(xb_train, yb_train)
     idx = torch.zeros((1, 1), dtype=torch.long)  # start at a space\empty
@@ -119,6 +119,40 @@ def main():
     )  # hack for bigram due to single batch dimension of the indicies
 
     # observe too the flat peak of the models capability - its time to move on to making use of the rest of the sequences
+
+    # Chapter 2: Self Attention
+    # A need for tokens N, N-1,...Ny, is to talk back to tokens N-y
+    # simplest way is to average\sum all tokens before N token
+    # simple == lossy, but its a start :)
+
+    # a lame way of doing things is the 'modern' way - loop
+    # xbow = torch.zeros((B,T,C))
+    # for b in range(B):
+    #     for t in range(T):
+    #         xprev = x[b,:t+1]
+    #         xbow[b,t] = torch.mean(xprev,0)
+    # This gives us a mean aggregate of the previous tokens for inference of next token
+    # but this does not parallelize nicely, not in a for loop - unless you want to build an optimization no one has bothered to make because seven people need this actually
+    # So we turn to linear algebra
+
+    # B, T, C = 4,8,2 # example only
+    # x = torch.randn(B,T,C)
+    # weights = torch.tril(torch.ones(T,T)) # create the matrix that allows sequence based contributions to the next token
+    # weights = weights / weights.sum(1, keepdim=True) # equally average all previous terms - basic
+    # xbow = weights @ x # dot multiply - now its parallel out of the box! :)
+
+    # third version!
+    # wei = torch.zeros((T, T))
+    # wei = wei.masked_fill(tril == 0, float("inf"))
+    # wei = F.softmax(wei, dim=-1) # this normalizes -inf to 0 and 0's to 1
+    # xbow = wei @ x
+    # tril = torch.tril()
+
+    # Note - all these still equally consider each token in a given sequence
+    # additionally, the token weights will get modified as they are now related to each other
+    # this is affinity - and this is the relationship of tokens to each other given sequence\context
+
+    # matrix multiplication of the weights in a triangular fashion provides a map of how to consider tokens with each other
 
 
 if __name__ == "__main__":
