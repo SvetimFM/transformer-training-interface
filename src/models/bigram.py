@@ -1,3 +1,4 @@
+from models.multi_head_attention import MultiHeadAttention
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
@@ -9,21 +10,39 @@ torch.manual_seed(1337)
 # But what is happening here per tutorial is essentially we take our training data and use it to train a bigram model that just looks at N token to predict N+1 token
 
 n_embed = 32
+num_heads = 8
+head_size = 4
 
 
 class BigramLM(nn.Module):
-    def __init__(self, vocab_size, block_size):
+    def __init__(self, vocab_size, batch_size, block_size):
         super().__init__()
         self.vocab_size = vocab_size
+        self.block_size = block_size
         self.token_embedding_table = nn.Embedding(
             vocab_size, n_embed
         )  # n_embed is number of embedded dimensions
         self.position_embedding_table = nn.Embedding(block_size, n_embed)
+        self.sa_head = MultiHeadAttention(
+            n_embed // 4, n_embed, head_size, batch_size, block_size
+        )
         self.lm_head = nn.Linear(n_embed, vocab_size)
 
     def forward(self, idx, targets=None):
+        B, T = idx.shape
+
         token_embeddings = self.token_embedding_table(idx)  # (B, T, C)
-        logits = self.lm_head(token_embeddings)  # (B,T, vocab_size)
+        token_embeddings = token_embeddings.to("cuda")
+        posit_embeddings = self.position_embedding_table(torch.arange(T, device="cuda"))
+        posit_embeddings = posit_embeddings.to("cuda")
+
+        # (T,C)
+        # now we are looking at our sequences through embeddings of their relationships
+        x = token_embeddings + posit_embeddings  # (B, T, C)
+        x = self.sa_head(x)
+
+        logits = self.lm_head(x)  # (B,T, vocab_size)
+
         # generation mode
         if targets is None:
             loss = None
@@ -43,11 +62,12 @@ class BigramLM(nn.Module):
 
     def generate(self, idx, max_new_tokens):
         for _ in range(max_new_tokens):
-            # get predictions
-            logits, loss = self(idx)
+            idx_cond = idx[:, -self.block_size :]
 
-            # bigram - looking just at the last token in the time sequence
-            logits = logits[:, -1, :]  # B, C - bye bye T dim! (for now)
+            # get predictions
+            logits, loss = self(idx_cond)
+
+            logits = logits[:, -1, :]
 
             # activate
             probs = F.softmax(logits, dim=-1)  # B, C

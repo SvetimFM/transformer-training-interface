@@ -8,3 +8,5 @@ __pycache__/
 *$py.class
 *.pyc
 .venv/
+
+seven_head_nonsense.py

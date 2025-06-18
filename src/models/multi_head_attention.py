@@ -1,0 +1,18 @@
+from models.self_attention import SelfAttentionHead
+import torch
+import torch.nn as nn
+from torch.nn import functional as F
+
+
+class MultiHeadAttention(nn.Module):
+    def __init__(self, num_heads, n_embed, head_size, batch_size, block_size):
+        super().__init__()
+        self.heads = nn.ModuleList(
+            [
+                SelfAttentionHead(head_size, n_embed, batch_size, block_size)
+                for _ in range(num_heads)
+            ]
+        )
+
+    def forward(self, x):
+        return torch.cat([heads(x) for heads in self.heads], dim=-1)

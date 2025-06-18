@@ -4,7 +4,6 @@ import torch
 # returns a batch of data for training or validation
 # in comes a tensor out comes tensor in specified chunks
 def batchifier(data, batch_size, block_size, device):
-    torch.manual_seed(1337)
 
     # data is a tensor of integers representing characters
     # batch_size is the number of sequences in a batch (for parallelization)

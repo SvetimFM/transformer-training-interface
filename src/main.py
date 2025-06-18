@@ -1,4 +1,5 @@
 from models.bigram import BigramLM
+from models.self_attention import SelfAttentionHead
 from utils.training_utils import batchifier
 from utils.dataset_preparation import get_dataset
 import torch
@@ -9,10 +10,12 @@ import torch
 block_size = (
     16  # what is the maximum length of a sequence which influences the next token
 )
-batch_size = 4  # how many sequences we want to process in parallel
-lr = 1e-2  # learning rate
+batch_size = 32  # how many sequences we want to process in parallel
+lr = 1e-3  # learning rate
 train_split = 0.85  # ratio of training to validation in the training dataset
-epochs = 1000
+steps = 5000
+eval_iter = 200
+
 # CUDA support
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -87,7 +90,7 @@ def main():
     #         )
 
     # bigram test
-    model = BigramLM(vocab_size, block_size)
+    model = BigramLM(vocab_size, batch_size, block_size)
     m = model.to(device)
     logits, loss = m(xb_train, yb_train)
     idx = torch.zeros((1, 1), dtype=torch.long)  # start at a space\empty
@@ -104,18 +107,25 @@ def main():
         m.parameters(), lr=lr
     )  # 1e-3 default for this tiny thing, still very fast
 
-    for _ in range(epochs):
-        xb, yb = xb_train, yb_train
+    for step in range(steps):
 
+        xb_train, yb_train = batchifier(
+            train_data, batch_size=batch_size, block_size=block_size, device=device
+        )
+        xb, yb = xb_train, yb_train
         logits, loss = m(xb, yb)
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
 
+        # Print progress every 500 steps
+        if step % 500 == 0:
+            print(f"step {step}/{steps}, Loss: {loss.item():.4f}")
+
     # observe improvement in loss and generation!
     print(f"loss post-training: {loss}")
     print(
-        f"example output: {decode(m.generate(idx, max_new_tokens=100)[0].tolist())}"
+        f"example output: {decode(m.generate(idx, max_new_tokens=eval_iter)[0].tolist())}"
     )  # hack for bigram due to single batch dimension of the indicies
 
     # observe too the flat peak of the models capability - its time to move on to making use of the rest of the sequences
@@ -153,6 +163,8 @@ def main():
     # this is affinity - and this is the relationship of tokens to each other given sequence\context
 
     # matrix multiplication of the weights in a triangular fashion provides a map of how to consider tokens with each other
+
+    # attention head time
 
 
 if __name__ == "__main__":
