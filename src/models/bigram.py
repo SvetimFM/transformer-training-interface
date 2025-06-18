@@ -1,4 +1,5 @@
 from models.multi_head_attention import MultiHeadAttention
+from models.hidden_layers import FeedForward
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
@@ -9,9 +10,9 @@ torch.manual_seed(1337)
 # Bigram Language Model
 # But what is happening here per tutorial is essentially we take our training data and use it to train a bigram model that just looks at N token to predict N+1 token
 
-n_embed = 32
+n_embed = 256
 num_heads = 8
-head_size = 4
+head_size = 32
 
 
 class BigramLM(nn.Module):
@@ -24,9 +25,10 @@ class BigramLM(nn.Module):
         )  # n_embed is number of embedded dimensions
         self.position_embedding_table = nn.Embedding(block_size, n_embed)
         self.sa_head = MultiHeadAttention(
-            n_embed // 4, n_embed, head_size, batch_size, block_size
+            num_heads, n_embed, head_size, batch_size, block_size
         )
-        self.lm_head = nn.Linear(n_embed, vocab_size)
+        self.ffwd = FeedForward(n_embed)
+        self.decoder_head = nn.Linear(n_embed, vocab_size)
 
     def forward(self, idx, targets=None):
         B, T = idx.shape
@@ -40,8 +42,9 @@ class BigramLM(nn.Module):
         # now we are looking at our sequences through embeddings of their relationships
         x = token_embeddings + posit_embeddings  # (B, T, C)
         x = self.sa_head(x)
+        x = self.ffwd(x)
 
-        logits = self.lm_head(x)  # (B,T, vocab_size)
+        logits = self.decoder_head(x)  # (B,T, vocab_size)
 
         # generation mode
         if targets is None:

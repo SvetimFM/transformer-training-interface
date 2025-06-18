@@ -8,10 +8,10 @@ import torch
 
 # training
 block_size = (
-    16  # what is the maximum length of a sequence which influences the next token
+    256  # what is the maximum length of a sequence which influences the next token
 )
-batch_size = 32  # how many sequences we want to process in parallel
-lr = 1e-3  # learning rate
+batch_size = 64  # how many sequences we want to process in parallel
+lr = 3e-4  # learning rate
 train_split = 0.85  # ratio of training to validation in the training dataset
 steps = 5000
 eval_iter = 200
