@@ -14,23 +14,27 @@ class TrainingMetrics:
     step: int = 0
     epoch: int = 0
     train_loss: float = 0.0
-    val_loss: float = 0.0
+    val_loss: Optional[float] = None
     learning_rate: float = 0.0
     perplexity: float = 0.0
-    val_perplexity: float = 0.0
+    val_perplexity: Optional[float] = None
     timestamp: float = field(default_factory=time.time)
     
     def to_dict(self):
-        return {
+        data = {
             "step": self.step,
             "epoch": self.epoch,
             "train_loss": self.train_loss,
-            "val_loss": self.val_loss,
             "learning_rate": self.learning_rate,
             "perplexity": self.perplexity,
-            "val_perplexity": self.val_perplexity,
             "timestamp": self.timestamp
         }
+        # Only include val_loss and val_perplexity if they exist
+        if self.val_loss is not None:
+            data["val_loss"] = self.val_loss
+        if self.val_perplexity is not None:
+            data["val_perplexity"] = self.val_perplexity
+        return data
 
 class Trainer:
     def __init__(self, model, train_data, val_data, config, device="cuda"):
@@ -55,7 +59,7 @@ class Trainer:
         
         self.metrics_history: List[TrainingMetrics] = []
         self.current_metrics = TrainingMetrics()
-        self.last_val_loss = 0.0
+        self.last_val_loss = None
         
         self.is_training = False
         self.should_stop = False
@@ -178,7 +182,7 @@ class Trainer:
                         print(f"Tail phase validation at step {global_step}")
                 else:
                     val_loss = self.last_val_loss
-                    val_perplexity = torch.exp(torch.tensor(val_loss)).item() if val_loss > 0 else 0.0
+                    val_perplexity = torch.exp(torch.tensor(val_loss)).item() if val_loss is not None else None
                 
                 self.current_metrics = TrainingMetrics(
                     step=global_step,

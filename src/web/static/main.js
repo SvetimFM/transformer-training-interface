@@ -78,7 +78,8 @@ function initChart() {
                 data: [],
                 borderColor: '#ff6384',
                 backgroundColor: 'rgba(255, 99, 132, 0.1)',
-                tension: 0.1
+                tension: 0.1,
+                spanGaps: true  // This will connect points across null values
             }]
         },
         options: {
@@ -139,17 +140,23 @@ function updateMetrics(metrics) {
     
     // Update chart - show every 50 steps instead of 100 for more responsive updates
     if (lossChart && metrics.step % 50 === 0) {
+        // Always update training loss
         lossChart.data.labels.push(metrics.step);
         lossChart.data.datasets[0].data.push(metrics.train_loss);
         
-        // Always add validation loss (even if it's the same as before) to keep lines continuous
-        lossChart.data.datasets[1].data.push(metrics.val_loss);
+        // Only add validation loss if it exists
+        if ('val_loss' in metrics && metrics.val_loss !== null) {
+            lossChart.data.datasets[1].data.push(metrics.val_loss);
+        }
         
         // Keep only last 50 points
         if (lossChart.data.labels.length > 50) {
             lossChart.data.labels.shift();
             lossChart.data.datasets[0].data.shift();
-            lossChart.data.datasets[1].data.shift();
+            // Only shift validation data if it has the same length
+            if (lossChart.data.datasets[1].data.length > 50) {
+                lossChart.data.datasets[1].data.shift();
+            }
         }
         
         lossChart.update('none');
@@ -971,14 +978,27 @@ async function loadMetricsHistory() {
             lossChart.data.datasets[0].data = [];
             lossChart.data.datasets[1].data = [];
             
+            // Separate arrays for training and validation
+            const valLossData = [];
+            const valLossLabels = [];
+            
             data.metrics.forEach(metric => {
                 if (metric.step % 100 === 0) {
                     lossChart.data.labels.push(metric.step);
                     lossChart.data.datasets[0].data.push(metric.train_loss);
-                    if (metric.val_loss > 0) {
-                        lossChart.data.datasets[1].data.push(metric.val_loss);
+                    
+                    // Only add validation data points when they exist
+                    if ('val_loss' in metric && metric.val_loss !== null && metric.val_loss !== undefined) {
+                        valLossLabels.push(metric.step);
+                        valLossData.push(metric.val_loss);
                     }
                 }
+            });
+            
+            // For validation loss, we need to align it with the correct steps
+            lossChart.data.datasets[1].data = lossChart.data.labels.map(step => {
+                const idx = valLossLabels.indexOf(step);
+                return idx >= 0 ? valLossData[idx] : null;
             });
             
             lossChart.update('none');
