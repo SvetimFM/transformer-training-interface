@@ -28,8 +28,6 @@ function initWebSocket() {
                 handleTrainingComplete(data.data);
             } else if (data.type === 'activation_update') {
                 updateActivations(data.data);
-            } else if (data.type === 'viz_phase') {
-                updateVisualizationPhase(data.data);
             }
         } catch (error) {
             console.error('Error parsing WebSocket message:', error);
@@ -565,43 +563,6 @@ function showComponentDetails(details) {
     setTimeout(() => {
         detailsDiv.classList.remove('visible');
     }, 5000);
-}
-
-// Update visualization phase display
-function updateVisualizationPhase(phaseData) {
-    if (currentConfig.training.visualization_mode && architectureViz) {
-        const phase = phaseData.phase;
-        let displayPhase = phase;
-        
-        // Map internal phase names to user-friendly names
-        const phaseMap = {
-            'Getting batch': 'Data Loading',
-            'Forward pass - Embeddings': 'Embeddings',
-            'Zeroing gradients': 'Clear Gradients',
-            'Backward pass': 'Backpropagation',
-            'Optimizer step': 'Weight Update',
-            'LR scheduler step': 'Learning Rate',
-            'Validation': 'Validation',
-            'Saving checkpoint': 'Checkpoint'
-        };
-        
-        if (phaseMap[phase]) {
-            displayPhase = phaseMap[phase];
-        }
-        
-        architectureViz.updateTrainingStatus(displayPhase, null, null);
-        
-        // Highlight specific components based on phase
-        if (phase === 'Forward pass - Embeddings') {
-            // Find and highlight embedding components
-            const embeddingComponents = Object.entries(architectureViz.components)
-                .filter(([id, comp]) => comp.type === 'embedding')
-                .map(([id]) => id);
-            if (embeddingComponents.length > 0) {
-                architectureViz.updateTrainingStatus(displayPhase, null, embeddingComponents[0]);
-            }
-        }
-    }
 }
 
 // Event listeners

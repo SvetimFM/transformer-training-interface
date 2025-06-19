@@ -16,9 +16,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import app_config, ModelConfig, TrainingConfig, GenerationConfig
 from models.bigram import BigramLM
-from models.visualization_bigram import VisualizationBigramLM
 from training.trainer import Trainer
-from training.visualization_trainer import VisualizationTrainer
 from utils.dataset_preparation import get_dataset
 from utils.training_utils import batchifier
 import torch.nn.functional as F
@@ -88,35 +86,24 @@ def initialize_model():
         train_data = data[:train_size].to(app_config.training.device)
         val_data = data[train_size:].to(app_config.training.device)
         
-        # Create model (use visualization model if in visualization mode)
-        if app_config.training.visualization_mode:
-            model = VisualizationBigramLM(
-                vocab_size=app_config.model.vocab_size,
-                batch_size=app_config.training.batch_size,
-                block_size=app_config.model.block_size,
-                config=app_config
-            ).to(app_config.training.device)
-            # Set visualization config
-            model.set_viz_config(app_config.training, broadcast_viz_phase)
-        else:
-            model = BigramLM(
-                vocab_size=app_config.model.vocab_size,
-                batch_size=app_config.training.batch_size,
-                block_size=app_config.model.block_size,
-                config=app_config
-            ).to(app_config.training.device)
+        # Create model
+        model = BigramLM(
+            vocab_size=app_config.model.vocab_size,
+            batch_size=app_config.training.batch_size,
+            block_size=app_config.model.block_size,
+            config=app_config
+        ).to(app_config.training.device)
         
         # Register model components for visualization
         register_model_components(model, app_config)
         
-        # Create trainer (use VisualizationTrainer for enhanced visualization mode)
-        trainer = VisualizationTrainer(model, train_data, val_data, app_config, app_config.training.device)
+        # Create trainer
+        trainer = Trainer(model, train_data, val_data, app_config, app_config.training.device)
         
         # Add callbacks to broadcast metrics
         trainer.add_callback("on_step", broadcast_metrics)
         trainer.add_callback("on_eval", broadcast_metrics)
         trainer.add_callback("on_training_end", broadcast_training_complete)
-        trainer.add_callback("on_viz_phase", broadcast_viz_phase)
         
         return True
     except Exception as e:
@@ -158,20 +145,6 @@ def broadcast_training_complete(final_metrics):
         print(f"Training completed: {completion_data['data']['message']}")
     except Exception as e:
         print(f"Error broadcasting completion: {e}")
-
-def broadcast_viz_phase(phase_info):
-    """Broadcast visualization phase information"""
-    try:
-        phase_data = {
-            "type": "viz_phase",
-            "data": {
-                "phase": phase_info.get("phase", "Unknown"),
-                "delay": phase_info.get("delay", 0)
-            }
-        }
-        metrics_queue.put(phase_data)
-    except Exception as e:
-        print(f"Error broadcasting viz phase: {e}")
 
 async def metrics_broadcaster():
     """Background task that broadcasts metrics from the queue"""
