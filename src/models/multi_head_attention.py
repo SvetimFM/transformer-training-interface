@@ -5,11 +5,11 @@ from torch.nn import functional as F
 
 
 class MultiHeadAttention(nn.Module):
-    def __init__(self, num_heads, n_embed, head_size, batch_size, block_size):
+    def __init__(self, num_heads, n_embed, head_size, batch_size, block_size, dropout=0.2):
         super().__init__()
         self.heads = nn.ModuleList(
             [
-                SelfAttentionHead(head_size, n_embed, batch_size, block_size)
+                SelfAttentionHead(head_size, n_embed, batch_size, block_size, dropout)
                 for _ in range(num_heads)
             ]
         )

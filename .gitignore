@@ -1,12 +1,32 @@
+# IDE and environment
 .history/
 .dependencies
 .claude
+.vscode/
+.idea/
 
-
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.pyc
 .venv/
+venv/
+env/
 
+# Model checkpoints and data
+checkpoints/
+*.pt
+*.pth
+metrics.json
+
+# Test files
 seven_head_nonsense.py
+test_*.py
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

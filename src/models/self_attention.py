@@ -4,7 +4,7 @@ from torch.nn import functional as F
 
 
 class SelfAttentionHead(nn.Module):
-    def __init__(self, head_size, n_embed, batch_size, block_size):
+    def __init__(self, head_size, n_embed, batch_size, block_size, dropout=0.2):
         super().__init__()
         self.n_embed = n_embed
         self.batch_size = batch_size
@@ -19,6 +19,9 @@ class SelfAttentionHead(nn.Module):
             "tril",
             torch.tril(torch.ones(self.block_size, self.block_size)),
         )  # adding a tril module
+        
+        self.attn_dropout = nn.Dropout(dropout)
+        self.proj_dropout = nn.Dropout(dropout)
 
     def forward(self, x):
         B, T, C = x.shape  # from here on, adopting the shared notation
@@ -37,8 +40,11 @@ class SelfAttentionHead(nn.Module):
         weights = weights.masked_fill(self.tril[:T, :T] == 0, float("-inf"))
 
         weights = F.softmax(weights, dim=-1)
+        weights = self.attn_dropout(weights)  # dropout on attention weights
+        
         v = self.value(x)
         out = weights @ v
         out = self.proj(out)  # project back to n_embed dimensions
+        out = self.proj_dropout(out)  # dropout after projection
 
         return out

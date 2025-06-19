@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transformer Training UI</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/architecture.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Transformer Training Interface</h1>
+        
+        <div class="main-grid">
+            <!-- Training Control Panel -->
+            <div class="panel" id="training-panel">
+                <h2>Training Control</h2>
+                <div class="control-group">
+                    <button id="start-training" class="btn btn-primary">Start Training</button>
+                    <button id="stop-training" class="btn btn-secondary">Stop Training</button>
+                </div>
+                <div class="status-info">
+                    <p>Status: <span id="training-status">Not Training</span></p>
+                    <p>Epoch: <span id="current-epoch">0</span> / <span id="total-epochs">10</span></p>
+                    <p>Step: <span id="current-step">0</span> / <span id="total-steps">5000</span></p>
+                    <p>Loss: <span id="current-loss">0.000</span></p>
+                    <p>Perplexity: <span id="current-perplexity">0.000</span></p>
+                    <p>Learning Rate: <span id="current-lr">0.0003</span></p>
+                </div>
+                <div id="training-completion" class="completion-info" style="display: none;"></div>
+            </div>
+            
+            <!-- Architecture Configuration -->
+            <div class="panel" id="arch-panel">
+                <h2>Model Architecture</h2>
+                <div class="config-group">
+                    <label class="switch-label">
+                        <input type="checkbox" id="use-layer-norm" class="toggle-switch">
+                        <span>Layer Normalization</span>
+                    </label>
+                    <label class="switch-label">
+                        <input type="checkbox" id="use-residual" class="toggle-switch">
+                        <span>Residual Connections</span>
+                    </label>
+                    <div class="radio-group">
+                        <label>Norm Position:</label>
+                        <label><input type="radio" name="norm-position" value="pre" checked> Pre</label>
+                        <label><input type="radio" name="norm-position" value="post"> Post</label>
+                    </div>
+                </div>
+                
+                <div class="slider-group">
+                    <label>Layers: <span id="n-layers-value">1</span></label>
+                    <input type="range" id="n-layers" min="1" max="12" value="1" class="slider">
+                    
+                    <label>Heads: <span id="n-heads-value">8</span></label>
+                    <input type="range" id="n-heads" min="1" max="16" value="8" class="slider">
+                    
+                    <label>Embed Dim: <span id="n-embed-value">256</span></label>
+                    <input type="range" id="n-embed" min="64" max="1024" step="64" value="256" class="slider">
+                </div>
+                
+                <button id="apply-architecture" class="btn btn-secondary">Apply Changes</button>
+            </div>
+            
+            <!-- Training Parameters -->
+            <div class="panel" id="params-panel">
+                <h2>Training Parameters</h2>
+                <div class="input-group">
+                    <label>Learning Rate:</label>
+                    <input type="number" id="learning-rate" value="0.0003" step="0.0001" min="0.00001" max="0.1">
+                    
+                    <label>Batch Size:</label>
+                    <input type="number" id="batch-size" value="64" min="1" max="256">
+                    
+                    <label>Epochs:</label>
+                    <input type="number" id="epochs" value="10" min="1" max="100">
+                    
+                    <label>Training Steps (optional):</label>
+                    <input type="number" id="train-steps" placeholder="Auto-calculate from epochs" min="100" max="100000">
+                    
+                    <label>LR Scheduler:</label>
+                    <select id="scheduler-type">
+                        <option value="warmup_cosine">Warmup + Cosine</option>
+                        <option value="warmup_linear">Warmup + Linear</option>
+                        <option value="warmup_constant">Warmup + Constant</option>
+                        <option value="onecycle">One Cycle</option>
+                    </select>
+                    
+                    <label>Warmup Ratio: <span id="warmup-ratio-value">5</span>%</label>
+                    <input type="range" id="warmup-ratio" min="0" max="20" step="1" value="5" class="slider">
+                    
+                    <label>Min LR Ratio: <span id="min-lr-ratio-value">10</span>%</label>
+                    <input type="range" id="min-lr-ratio" min="0" max="50" step="5" value="10" class="slider">
+                </div>
+                <button id="update-params" class="btn btn-secondary">Update Parameters</button>
+                <button id="preview-schedule" class="btn btn-secondary">Preview Schedule</button>
+            </div>
+            
+            <!-- Loss Chart -->
+            <div class="panel chart-panel" id="loss-chart-panel">
+                <h2>Training Metrics</h2>
+                <canvas id="loss-chart"></canvas>
+            </div>
+            
+            <!-- Learning Rate Schedule -->
+            <div class="panel" id="lr-schedule-panel">
+                <h2>Learning Rate Schedule</h2>
+                <canvas id="lr-schedule-chart"></canvas>
+                <div class="lr-schedule-info">
+                    <p>Current Phase: <span id="lr-phase">Not Started</span></p>
+                    <p>Schedule Type: <span id="lr-schedule-type">Warmup + Cosine</span></p>
+                </div>
+            </div>
+            
+            <!-- Architecture Visualization -->
+            <div class="panel chart-panel" id="architecture-panel">
+                <h2>Model Architecture</h2>
+                <div class="architecture-controls">
+                    <button id="reset-zoom">Reset View</button>
+                    <button id="toggle-animations">Toggle Animations</button>
+                    <label class="switch-label">
+                        <input type="checkbox" id="visualization-mode" class="toggle-switch">
+                        <span>Visualization Mode</span>
+                    </label>
+                    <div id="visualization-speed-control" style="display: none;">
+                        <label>Speed: <span id="visualization-speed-value">1</span>%</label>
+                        <input type="range" id="visualization-speed" min="1" max="100" value="1" class="slider">
+                    </div>
+                </div>
+                <div id="architecture-container"></div>
+                <div class="component-details" id="component-details">
+                    <h4 id="component-name"></h4>
+                    <div id="component-params"></div>
+                </div>
+                <div class="architecture-legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #9333ea;"></div>
+                        <span>Embedding</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #3b82f6;"></div>
+                        <span>Linear</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #10b981;"></div>
+                        <span>Attention</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #f59e0b;"></div>
+                        <span>Normalization</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #ef4444;"></div>
+                        <span>Dropout</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Text Generation -->
+            <div class="panel" id="generation-panel">
+                <h2>Text Generation</h2>
+                <div class="input-group">
+                    <label>Prompt:</label>
+                    <input type="text" id="prompt-input" placeholder="Enter prompt text...">
+                    
+                    <label>Max Tokens: <span id="max-tokens-value">100</span></label>
+                    <input type="range" id="max-tokens" min="10" max="500" value="100" class="slider">
+                    
+                    <label>Temperature: <span id="temperature-value">1.0</span></label>
+                    <input type="range" id="temperature" min="0.1" max="2.0" step="0.1" value="1.0" class="slider">
+                </div>
+                <button id="generate-text" class="btn btn-primary">Generate</button>
+                <div class="output-box" id="generated-text"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/architecture.js"></script>
+    <script src="/static/main.js"></script>
+</body>
+</html>
