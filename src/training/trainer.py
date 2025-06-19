@@ -102,6 +102,14 @@ class Trainer:
         y = torch.stack([data[i+1:i+self.config.model.block_size+1] for i in ix])
         return x.to(self.device), y.to(self.device)
     
+    def _get_viz_delay(self, multiplier=1.0):
+        """Calculate visualization delay based on speed ratio"""
+        if self.config.training.visualization_mode and self.config.training.visualization_speed_ratio > 0:
+            # Base delay scaled by speed ratio and multiplier
+            delay = (1 - self.config.training.visualization_speed_ratio) / self.config.training.visualization_speed_ratio * 0.05 * multiplier
+            return min(delay, 2.0)  # Cap at 2 seconds
+        return 0
+    
     def _training_loop(self):
         self.model.train()
         
@@ -123,11 +131,27 @@ class Trainer:
                 if self.should_stop or global_step >= total_steps:
                     break
                 
+                # Get batch with optional viz delay
+                if self.config.training.visualization_mode:
+                    time.sleep(self._get_viz_delay(0.5))  # Small delay for batch loading
                 xb, yb = self._get_batch(self.train_data)
                 
+                # Forward pass
                 logits, loss = self.model(xb, yb)
+                
+                # Gradient reset with viz delay
+                if self.config.training.visualization_mode:
+                    time.sleep(self._get_viz_delay(0.5))
                 self.optimizer.zero_grad()
+                
+                # Backward pass with viz delay
+                if self.config.training.visualization_mode:
+                    time.sleep(self._get_viz_delay(1.0))  # Full delay for backward
                 loss.backward()
+                
+                # Optimizer step with viz delay
+                if self.config.training.visualization_mode:
+                    time.sleep(self._get_viz_delay(0.5))
                 self.optimizer.step()
                 
                 # Step the learning rate scheduler
