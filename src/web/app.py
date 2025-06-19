@@ -217,6 +217,29 @@ async def update_config(config_update: ConfigUpdate):
         training_updated = False
         
         if config_update.model:
+            # Validate model configuration
+            new_model_config = config_update.model
+            n_embed = new_model_config.get('n_embed', app_config.model.n_embed)
+            n_heads = new_model_config.get('n_heads', app_config.model.n_heads)
+            
+            if n_embed % n_heads != 0:
+                head_size = n_embed / n_heads
+                valid_sizes = [n_heads * i for i in range(8, 17)]
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid configuration: n_embed ({n_embed}) must be divisible by n_heads ({n_heads}). "
+                           f"Current head_size would be {head_size:.2f}, but it must be an integer. "
+                           f"Try n_embed values like: {', '.join(map(str, valid_sizes))}"
+                )
+            
+            head_size = n_embed // n_heads
+            if head_size < 4:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid configuration: head_size ({head_size}) is too small. "
+                           f"With n_heads={n_heads}, you need n_embed >= {n_heads * 4}."
+                )
+            
             app_config.model = ModelConfig(**config_update.model)
             model_updated = True
         if config_update.training:

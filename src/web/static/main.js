@@ -619,14 +619,38 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Architecture configuration
     document.getElementById('apply-architecture').addEventListener('click', async () => {
+        const n_heads = parseInt(document.getElementById('n-heads').value);
+        const n_embed = parseInt(document.getElementById('n-embed').value);
+        
+        // Validate configuration
+        if (n_embed % n_heads !== 0) {
+            const headSize = n_embed / n_heads;
+            const validSizes = [];
+            for (let i = 8; i <= 16; i++) {
+                validSizes.push(n_heads * i);
+            }
+            alert(`Invalid configuration: n_embed (${n_embed}) must be divisible by n_heads (${n_heads}).\n` +
+                  `Current head_size would be ${headSize.toFixed(2)}, but it must be an integer.\n\n` +
+                  `Try n_embed values like: ${validSizes.join(', ')}`);
+            return;
+        }
+        
+        const headSize = n_embed / n_heads;
+        if (headSize < 4) {
+            alert(`Invalid configuration: head_size (${headSize}) is too small.\n` +
+                  `With n_heads=${n_heads}, you need n_embed >= ${n_heads * 4}.\n` +
+                  `Consider reducing n_heads or increasing n_embed.`);
+            return;
+        }
+        
         const modelConfig = {
             ...currentConfig.model,
             use_layer_norm: document.getElementById('use-layer-norm').checked,
             use_residual: document.getElementById('use-residual').checked,
             norm_position: document.querySelector('input[name="norm-position"]:checked').value,
             n_layers: parseInt(document.getElementById('n-layers').value),
-            n_heads: parseInt(document.getElementById('n-heads').value),
-            n_embed: parseInt(document.getElementById('n-embed').value)
+            n_heads: n_heads,
+            n_embed: n_embed
         };
         
         try {
@@ -704,6 +728,41 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
+    // Function to validate and show head size
+    function updateHeadSizeDisplay() {
+        const n_heads = parseInt(document.getElementById('n-heads').value);
+        const n_embed = parseInt(document.getElementById('n-embed').value);
+        const headSizeDisplay = document.getElementById('head-size-display');
+        
+        if (!headSizeDisplay) {
+            // Create head size display if it doesn't exist
+            const embedLabel = document.querySelector('label[for="n-embed"]').parentElement;
+            const display = document.createElement('div');
+            display.id = 'head-size-display';
+            display.style.marginTop = '10px';
+            display.style.fontSize = '14px';
+            embedLabel.appendChild(display);
+        }
+        
+        const display = document.getElementById('head-size-display');
+        
+        if (n_embed % n_heads !== 0) {
+            const headSize = n_embed / n_heads;
+            display.innerHTML = `<span style="color: #ef4444;">⚠️ Invalid: head_size = ${headSize.toFixed(2)} (must be integer)</span>`;
+            display.style.display = 'block';
+        } else {
+            const headSize = n_embed / n_heads;
+            if (headSize < 4) {
+                display.innerHTML = `<span style="color: #ef4444;">⚠️ head_size = ${headSize} (too small, need >= 4)</span>`;
+            } else if ((headSize & (headSize - 1)) !== 0) {
+                display.innerHTML = `<span style="color: #f59e0b;">ℹ️ head_size = ${headSize} (works, but not power of 2)</span>`;
+            } else {
+                display.innerHTML = `<span style="color: #4ade80;">✓ head_size = ${headSize}</span>`;
+            }
+            display.style.display = 'block';
+        }
+    }
+    
     // Sliders
     document.getElementById('n-layers').addEventListener('input', (e) => {
         document.getElementById('n-layers-value').textContent = e.target.value;
@@ -711,11 +770,16 @@ document.addEventListener('DOMContentLoaded', () => {
     
     document.getElementById('n-heads').addEventListener('input', (e) => {
         document.getElementById('n-heads-value').textContent = e.target.value;
+        updateHeadSizeDisplay();
     });
     
     document.getElementById('n-embed').addEventListener('input', (e) => {
         document.getElementById('n-embed-value').textContent = e.target.value;
+        updateHeadSizeDisplay();
     });
+    
+    // Initial validation display
+    updateHeadSizeDisplay();
     
     document.getElementById('max-tokens').addEventListener('input', (e) => {
         document.getElementById('max-tokens-value').textContent = e.target.value;
