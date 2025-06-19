@@ -23,6 +23,7 @@ import torch.nn.functional as F
 from visualization.hooks import register_model_components
 from visualization.component_registry import component_registry
 from visualization.activation_tracker import activation_tracker
+from visualization.attention_capture import attention_capture
 
 app = FastAPI(title="Transformer Training UI")
 
@@ -60,6 +61,9 @@ class GenerateRequest(BaseModel):
 
 class TrainingControl(BaseModel):
     action: str  # "start" or "stop"
+
+class AttentionCaptureRequest(BaseModel):
+    text: str = "The quick brown fox jumps over the lazy dog"
 
 # Initialize model and data
 def initialize_model():
@@ -334,6 +338,46 @@ async def get_metrics_history():
 async def get_architecture():
     """Get the model architecture for visualization"""
     return component_registry.get_architecture_graph()
+
+@app.post("/api/attention/capture")
+async def capture_attention(request: AttentionCaptureRequest):
+    """Capture attention patterns from next forward pass"""
+    if model is None:
+        raise HTTPException(status_code=400, detail="Model not initialized")
+    
+    try:
+        # Start attention capture
+        attention_capture.start_capture()
+        
+        # Do a single forward pass with some sample data
+        with torch.no_grad():
+            sample_text = request.text
+            encoded = encode(sample_text[:min(len(sample_text), app_config.model.block_size)])
+            x = torch.tensor([encoded], dtype=torch.long).to(app_config.training.device)
+            
+            # Forward pass (this will capture attention weights)
+            model(x)
+        
+        # Stop capture and get patterns
+        attention_capture.stop_capture()
+        patterns = attention_capture.get_attention_patterns()
+        head_info = attention_capture.get_head_info()
+        
+        # Convert patterns to serializable format
+        result = {
+            "text": sample_text,
+            "tokens": [decode([token]) for token in encoded],
+            "patterns": {},
+            "head_info": head_info
+        }
+        
+        for head_id, pattern in patterns.items():
+            result["patterns"][head_id] = pattern.tolist()
+        
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/lr_schedule")
 async def get_lr_schedule():

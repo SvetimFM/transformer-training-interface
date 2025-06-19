@@ -41,6 +41,13 @@ class TrainingConfig(BaseModel):
     visualization_mode: bool = False  # Slow training for visualization
     visualization_speed_ratio: float = 0.01  # 1% of normal speed by default
     
+    # Optimization settings
+    compile_model: bool = True  # Use torch.compile() for faster training
+    compile_mode: str = "default"  # default, reduce-overhead, max-autotune
+    use_amp: bool = True  # Use automatic mixed precision
+    gradient_accumulation_steps: int = 1  # Number of steps to accumulate gradients
+    gradient_clip_norm: Optional[float] = 1.0  # Max gradient norm for clipping
+    
     class Config:
         validate_assignment = True
 

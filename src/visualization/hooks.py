@@ -2,6 +2,7 @@ import torch.nn as nn
 from typing import Optional
 from .component_registry import ComponentType, component_registry
 from .activation_tracker import activation_tracker
+from .attention_capture import attention_capture
 
 def register_model_components(model: nn.Module, config=None):
     """Register all model components for visualization"""
@@ -10,6 +11,7 @@ def register_model_components(model: nn.Module, config=None):
     component_registry.components.clear()
     component_registry.module_to_id.clear()
     activation_tracker.remove_all_hooks()
+    attention_capture.clear()
     
     # Register main model
     model_id = component_registry.register_component(
@@ -109,7 +111,8 @@ def register_transformer_block(block: nn.Module, name: str, parent_id: str, laye
         attn_id = register_multi_head_attention(
             block.attention, 
             "Multi-Head Attention", 
-            block_id
+            block_id,
+            layer_idx
         )
     
     # Post-norm 1
@@ -168,7 +171,7 @@ def register_transformer_block(block: nn.Module, name: str, parent_id: str, laye
     
     return block_id
 
-def register_multi_head_attention(mha: nn.Module, name: str, parent_id: str) -> str:
+def register_multi_head_attention(mha: nn.Module, name: str, parent_id: str, layer_idx: int = 0) -> str:
     """Register multi-head attention and its heads"""
     
     mha_id = component_registry.register_component(
@@ -191,6 +194,9 @@ def register_multi_head_attention(mha: nn.Module, name: str, parent_id: str) -> 
             )
             activation_tracker.add_forward_hook(head, head_id)
             activation_tracker.add_backward_hook(head, head_id)
+            
+            # Register for attention capture
+            attention_capture.register_attention_head(head, head_id, i, layer_idx)
     
     return mha_id
 

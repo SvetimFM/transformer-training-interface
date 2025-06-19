@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.optim import AdamW
+from torch.amp import autocast, GradScaler
 import threading
 import time
 import os
@@ -19,6 +20,9 @@ class TrainingMetrics:
     perplexity: float = 0.0
     val_perplexity: Optional[float] = None
     timestamp: float = field(default_factory=time.time)
+    tokens_per_second: float = 0.0
+    gpu_memory_mb: float = 0.0
+    gradient_norm: Optional[float] = None
     
     def to_dict(self):
         data = {
@@ -27,13 +31,17 @@ class TrainingMetrics:
             "train_loss": self.train_loss,
             "learning_rate": self.learning_rate,
             "perplexity": self.perplexity,
-            "timestamp": self.timestamp
+            "timestamp": self.timestamp,
+            "tokens_per_second": self.tokens_per_second,
+            "gpu_memory_mb": self.gpu_memory_mb
         }
         # Only include val_loss and val_perplexity if they exist
         if self.val_loss is not None:
             data["val_loss"] = self.val_loss
         if self.val_perplexity is not None:
             data["val_perplexity"] = self.val_perplexity
+        if self.gradient_norm is not None:
+            data["gradient_norm"] = self.gradient_norm
         return data
 
 class Trainer:
@@ -44,7 +52,16 @@ class Trainer:
         self.config = config
         self.device = device
         
+        # Compile model if requested
+        if config.training.compile_model and hasattr(torch, 'compile'):
+            print(f"Compiling model with mode: {config.training.compile_mode}")
+            self.model = torch.compile(model, mode=config.training.compile_mode)
+        
         self.optimizer = AdamW(model.parameters(), lr=config.training.learning_rate)
+        
+        # Initialize AMP scaler if enabled
+        self.scaler = GradScaler('cuda') if config.training.use_amp else None
+        self.accumulation_steps = config.training.gradient_accumulation_steps
         
         # Calculate steps per epoch first
         self.steps_per_epoch = len(train_data) // config.training.batch_size
@@ -74,6 +91,10 @@ class Trainer:
         }
         
         os.makedirs(config.training.checkpoint_dir, exist_ok=True)
+        
+        # Performance tracking
+        self.tokens_processed = 0
+        self.last_time = time.time()
     
     def add_callback(self, event: str, callback: Callable):
         if event in self.callbacks:
@@ -94,7 +115,13 @@ class Trainer:
         
         for _ in range(min(max_batches, len(self.val_data) // self.config.training.batch_size)):
             xb, yb = self._get_batch(self.val_data)
-            _, loss = self.model(xb, yb)
+            
+            if self.config.training.use_amp:
+                with autocast('cuda'):
+                    _, loss = self.model(xb, yb)
+            else:
+                _, loss = self.model(xb, yb)
+                
             losses.append(loss.item())
         
         self.model.train()
@@ -135,28 +162,68 @@ class Trainer:
                 if self.should_stop or global_step >= total_steps:
                     break
                 
+                # Track timing for performance metrics
+                step_start_time = time.time()
+                
                 # Get batch with optional viz delay
                 if self.config.training.visualization_mode:
                     time.sleep(self._get_viz_delay(0.5))  # Small delay for batch loading
                 xb, yb = self._get_batch(self.train_data)
                 
-                # Forward pass
-                logits, loss = self.model(xb, yb)
-                
-                # Gradient reset with viz delay
-                if self.config.training.visualization_mode:
-                    time.sleep(self._get_viz_delay(0.5))
-                self.optimizer.zero_grad()
+                # Forward pass with AMP
+                if self.config.training.use_amp:
+                    with autocast('cuda'):
+                        logits, loss = self.model(xb, yb)
+                        # Scale loss for gradient accumulation
+                        loss = loss / self.accumulation_steps
+                else:
+                    logits, loss = self.model(xb, yb)
+                    loss = loss / self.accumulation_steps
                 
                 # Backward pass with viz delay
                 if self.config.training.visualization_mode:
                     time.sleep(self._get_viz_delay(1.0))  # Full delay for backward
-                loss.backward()
                 
-                # Optimizer step with viz delay
-                if self.config.training.visualization_mode:
-                    time.sleep(self._get_viz_delay(0.5))
-                self.optimizer.step()
+                if self.config.training.use_amp:
+                    self.scaler.scale(loss).backward()
+                else:
+                    loss.backward()
+                
+                # Update weights only after accumulation steps
+                if (global_step + 1) % self.accumulation_steps == 0:
+                    # Gradient clipping
+                    gradient_norm = None
+                    if self.config.training.gradient_clip_norm is not None:
+                        if self.config.training.use_amp:
+                            self.scaler.unscale_(self.optimizer)
+                        gradient_norm = torch.nn.utils.clip_grad_norm_(
+                            self.model.parameters(), 
+                            self.config.training.gradient_clip_norm
+                        ).item()
+                    
+                    # Optimizer step with viz delay
+                    if self.config.training.visualization_mode:
+                        time.sleep(self._get_viz_delay(0.5))
+                    
+                    if self.config.training.use_amp:
+                        self.scaler.step(self.optimizer)
+                        self.scaler.update()
+                    else:
+                        self.optimizer.step()
+                    
+                    # Zero gradients for next accumulation
+                    self.optimizer.zero_grad()
+                
+                # Calculate performance metrics
+                step_time = time.time() - step_start_time
+                batch_tokens = xb.numel()
+                self.tokens_processed += batch_tokens
+                tokens_per_second = batch_tokens / step_time if step_time > 0 else 0
+                
+                # Get GPU memory usage
+                gpu_memory_mb = 0.0
+                if torch.cuda.is_available():
+                    gpu_memory_mb = torch.cuda.memory_allocated(self.device) / 1024 / 1024
                 
                 # Step the learning rate scheduler
                 current_lr = self.scheduler.step()
@@ -187,11 +254,14 @@ class Trainer:
                 self.current_metrics = TrainingMetrics(
                     step=global_step,
                     epoch=epoch,
-                    train_loss=loss.item(),
+                    train_loss=loss.item() * self.accumulation_steps,  # Unscale loss
                     val_loss=val_loss,
                     learning_rate=current_lr,
-                    perplexity=torch.exp(loss).item(),
-                    val_perplexity=val_perplexity
+                    perplexity=torch.exp(loss * self.accumulation_steps).item(),
+                    val_perplexity=val_perplexity,
+                    tokens_per_second=tokens_per_second,
+                    gpu_memory_mb=gpu_memory_mb,
+                    gradient_norm=gradient_norm if (global_step + 1) % self.accumulation_steps == 0 else None
                 )
                 
                 # Only append to history on eval intervals (using dynamic interval)

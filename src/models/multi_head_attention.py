@@ -14,5 +14,14 @@ class MultiHeadAttention(nn.Module):
             ]
         )
 
-    def forward(self, x):
-        return torch.cat([heads(x) for heads in self.heads], dim=-1)
+    def forward(self, x, return_attention=False):
+        if return_attention:
+            outputs = []
+            attentions = []
+            for head in self.heads:
+                out, attn = head(x, return_attention=True)
+                outputs.append(out)
+                attentions.append(attn)
+            return torch.cat(outputs, dim=-1), attentions
+        else:
+            return torch.cat([head(x) for head in self.heads], dim=-1)

@@ -133,6 +133,17 @@ function updateMetrics(metrics) {
         document.getElementById('current-epoch').textContent = metrics.epoch + 1;
     }
     
+    // Update performance metrics
+    if ('tokens_per_second' in metrics) {
+        document.getElementById('tokens-per-second').textContent = Math.round(metrics.tokens_per_second);
+    }
+    if ('gpu_memory_mb' in metrics) {
+        document.getElementById('gpu-memory').textContent = metrics.gpu_memory_mb.toFixed(0);
+    }
+    if ('gradient_norm' in metrics && metrics.gradient_norm !== null) {
+        document.getElementById('gradient-norm').textContent = metrics.gradient_norm.toFixed(3);
+    }
+    
     // Update architecture visualization status in visualization mode
     if (currentConfig.training.visualization_mode && architectureViz) {
         architectureViz.updateTrainingStatus('Training', metrics.step);
@@ -245,6 +256,20 @@ function updateConfigUI(config) {
         const minLrPercent = Math.round(config.training.min_lr_ratio * 100);
         document.getElementById('min-lr-ratio').value = minLrPercent;
         document.getElementById('min-lr-ratio-value').textContent = minLrPercent;
+    }
+    
+    // Optimization settings
+    if (config.training.compile_model !== undefined) {
+        document.getElementById('compile-model').checked = config.training.compile_model;
+    }
+    if (config.training.use_amp !== undefined) {
+        document.getElementById('use-amp').checked = config.training.use_amp;
+    }
+    if (config.training.gradient_accumulation_steps !== undefined) {
+        document.getElementById('gradient-accumulation-steps').value = config.training.gradient_accumulation_steps;
+    }
+    if (config.training.gradient_clip_norm !== undefined) {
+        document.getElementById('gradient-clip-norm').value = config.training.gradient_clip_norm;
     }
 }
 
@@ -692,7 +717,11 @@ document.addEventListener('DOMContentLoaded', () => {
             train_steps: trainStepsValue ? parseInt(trainStepsValue) : null,
             scheduler_type: document.getElementById('scheduler-type').value,
             warmup_ratio: parseInt(document.getElementById('warmup-ratio').value) / 100,
-            min_lr_ratio: parseInt(document.getElementById('min-lr-ratio').value) / 100
+            min_lr_ratio: parseInt(document.getElementById('min-lr-ratio').value) / 100,
+            compile_model: document.getElementById('compile-model').checked,
+            use_amp: document.getElementById('use-amp').checked,
+            gradient_accumulation_steps: parseInt(document.getElementById('gradient-accumulation-steps').value),
+            gradient_clip_norm: parseFloat(document.getElementById('gradient-clip-norm').value)
         };
         
         try {

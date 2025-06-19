@@ -23,7 +23,7 @@ class SelfAttentionHead(nn.Module):
         self.attn_dropout = nn.Dropout(dropout)
         self.proj_dropout = nn.Dropout(dropout)
 
-    def forward(self, x):
+    def forward(self, x, return_attention=False):
         B, T, C = x.shape  # from here on, adopting the shared notation
 
         k = self.key(x)  # (B T HEAD_W)
@@ -40,6 +40,11 @@ class SelfAttentionHead(nn.Module):
         weights = weights.masked_fill(self.tril[:T, :T] == 0, float("-inf"))
 
         weights = F.softmax(weights, dim=-1)
+        
+        # Store pre-dropout weights for visualization
+        if return_attention:
+            attention_weights = weights.clone()
+        
         weights = self.attn_dropout(weights)  # dropout on attention weights
         
         v = self.value(x)
@@ -47,4 +52,6 @@ class SelfAttentionHead(nn.Module):
         out = self.proj(out)  # project back to n_embed dimensions
         out = self.proj_dropout(out)  # dropout after projection
 
+        if return_attention:
+            return out, attention_weights
         return out

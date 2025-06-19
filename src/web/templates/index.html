@@ -28,6 +28,9 @@
                     <p>Loss: <span id="current-loss">0.000</span></p>
                     <p>Perplexity: <span id="current-perplexity">0.000</span></p>
                     <p>Learning Rate: <span id="current-lr">0.0003</span></p>
+                    <p>Tokens/sec: <span id="tokens-per-second">0</span></p>
+                    <p>GPU Memory: <span id="gpu-memory">0</span> MB</p>
+                    <p>Gradient Norm: <span id="gradient-norm">-</span></p>
                 </div>
                 <div id="training-completion" class="completion-info" style="display: none;"></div>
             </div>
@@ -95,6 +98,25 @@
                     <label>Min LR Ratio: <span id="min-lr-ratio-value">10</span>%</label>
                     <input type="range" id="min-lr-ratio" min="0" max="50" step="5" value="10" class="slider">
                 </div>
+                
+                <h3>Optimization Settings</h3>
+                <div class="config-group">
+                    <label class="switch-label">
+                        <input type="checkbox" id="compile-model" class="toggle-switch" checked>
+                        <span>Torch Compile</span>
+                    </label>
+                    <label class="switch-label">
+                        <input type="checkbox" id="use-amp" class="toggle-switch" checked>
+                        <span>Mixed Precision (FP16)</span>
+                    </label>
+                    
+                    <label>Gradient Accumulation Steps:</label>
+                    <input type="number" id="gradient-accumulation-steps" value="1" min="1" max="32">
+                    
+                    <label>Gradient Clip Norm:</label>
+                    <input type="number" id="gradient-clip-norm" value="1.0" step="0.1" min="0.1" max="10">
+                </div>
+                
                 <button id="update-params" class="btn btn-secondary">Update Parameters</button>
                 <button id="preview-schedule" class="btn btn-secondary">Preview Schedule</button>
             </div>
@@ -174,6 +196,10 @@
                 </div>
                 <button id="generate-text" class="btn btn-primary">Generate</button>
                 <div class="output-box" id="generated-text"></div>
+                
+                <div style="margin-top: 20px;">
+                    <a href="/static/attention.html" class="btn btn-secondary">View Attention Patterns →</a>
+                </div>
             </div>
         </div>
     </div>
