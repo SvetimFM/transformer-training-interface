@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 
 class ModelConfig(BaseModel):
     vocab_size: int = 65
@@ -60,17 +60,29 @@ class GenerationConfig(BaseModel):
     class Config:
         validate_assignment = True
 
+class LoRAConfig(BaseModel):
+    rank: int = 8
+    alpha: int = 16
+    dropout: float = 0.0
+    target_modules: List[str] = ["key", "query", "value", "proj", "decoder_head"]
+    lora_lr_multiplier: float = 1.0  # Learning rate multiplier for LoRA parameters
+    
+    class Config:
+        validate_assignment = True
+
 class AppConfig:
     def __init__(self):
         self.model = ModelConfig()
         self.training = TrainingConfig()
         self.generation = GenerationConfig()
+        self.lora = LoRAConfig()
         
     def to_dict(self):
         return {
             "model": self.model.model_dump(),
             "training": self.training.model_dump(),
-            "generation": self.generation.model_dump()
+            "generation": self.generation.model_dump(),
+            "lora": self.lora.model_dump()
         }
     
     def update_from_dict(self, config_dict):
@@ -80,5 +92,7 @@ class AppConfig:
             self.training = TrainingConfig(**config_dict["training"])
         if "generation" in config_dict:
             self.generation = GenerationConfig(**config_dict["generation"])
+        if "lora" in config_dict:
+            self.lora = LoRAConfig(**config_dict["lora"])
 
 app_config = AppConfig()

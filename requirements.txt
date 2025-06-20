@@ -8,3 +8,6 @@ uvicorn[standard]==0.34.0
 websockets==14.1
 pydantic==2.10.5
 python-multipart==0.0.20
+streamlit==1.40.2
+pandas==2.2.3
+plotly==5.24.1
