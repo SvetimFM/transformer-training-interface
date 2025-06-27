@@ -267,14 +267,14 @@ function updatePCNMetrics(data) {
 }
 
 function updatePCNExploration(data) {
-    // Update energy chart
-    if (typeof updatePCNEnergy === 'function' && data.energy) {
-        updatePCNEnergy(data.energy);
+    // Update energy chart with both datasets
+    if (typeof updatePCNEnergy === 'function' && data.energy_leaked && data.energy_clean) {
+        updatePCNEnergy(data.energy_leaked, data.energy_clean);
     }
     
-    // Update diversity chart
-    if (typeof updatePCNDiversity === 'function' && data.diversity) {
-        updatePCNDiversity(data.diversity);
+    // Update diversity chart with both datasets
+    if (typeof updatePCNDiversity === 'function' && data.diversity_leaked && data.diversity_clean) {
+        updatePCNDiversity(data.diversity_leaked, data.diversity_clean);
     }
 }
 

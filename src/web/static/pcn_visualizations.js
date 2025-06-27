@@ -66,10 +66,18 @@ function initPCNCharts() {
             data: {
                 labels: [],
                 datasets: [{
-                    label: 'Energy',
+                    label: 'Energy (With Label Leakage)',
                     data: [],
-                    borderColor: 'rgb(99, 102, 241)',
-                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                    borderColor: 'rgb(239, 68, 68)',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.4
+                }, {
+                    label: 'Energy (Without Label Leakage)',
+                    data: [],
+                    borderColor: 'rgb(34, 197, 94)',
+                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                    borderWidth: 2,
                     tension: 0.4
                 }]
             },
@@ -78,7 +86,17 @@ function initPCNCharts() {
                 maintainAspectRatio: false,
                 scales: {
                     y: {
-                        beginAtZero: true
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Energy Value'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Refinement Step'
+                        }
                     }
                 }
             }
@@ -92,11 +110,19 @@ function initPCNCharts() {
             type: 'scatter',
             data: {
                 datasets: [{
-                    label: 'Diversity Score',
+                    label: 'Diversity (With Label Leakage)',
                     data: [],
-                    backgroundColor: 'rgba(236, 72, 153, 0.5)',
-                    borderColor: 'rgb(236, 72, 153)',
-                    pointRadius: 5
+                    backgroundColor: 'rgba(239, 68, 68, 0.6)',
+                    borderColor: 'rgb(239, 68, 68)',
+                    pointRadius: 6,
+                    pointHoverRadius: 8
+                }, {
+                    label: 'Diversity (Without Label Leakage)',
+                    data: [],
+                    backgroundColor: 'rgba(34, 197, 94, 0.6)',
+                    borderColor: 'rgb(34, 197, 94)',
+                    pointRadius: 6,
+                    pointHoverRadius: 8
                 }]
             },
             options: {
@@ -185,23 +211,36 @@ function updatePCNComparison(withLeakage, withoutLeakage, epoch = null) {
     }
 }
 
-// Update PCN energy chart
-function updatePCNEnergy(energyData) {
+// Update PCN energy chart with both datasets
+function updatePCNEnergy(energyLeaked, energyClean) {
     if (pcnEnergyChart) {
-        pcnEnergyChart.data.labels = energyData.steps;
-        pcnEnergyChart.data.datasets[0].data = energyData.values;
+        // Update labels (same for both datasets)
+        pcnEnergyChart.data.labels = energyLeaked.steps;
+        
+        // Update data for both datasets
+        pcnEnergyChart.data.datasets[0].data = energyLeaked.values;  // With leakage
+        pcnEnergyChart.data.datasets[1].data = energyClean.values;   // Without leakage
+        
         pcnEnergyChart.update();
     }
 }
 
-// Update PCN diversity chart
-function updatePCNDiversity(diversityData) {
+// Update PCN diversity chart with both datasets
+function updatePCNDiversity(diversityLeaked, diversityClean) {
     if (pcnDiversityChart) {
-        const scatterData = diversityData.map((value, index) => ({
+        // Convert to scatter data format for both datasets
+        const scatterLeaked = diversityLeaked.map((value, index) => ({
             x: index,
             y: value
         }));
-        pcnDiversityChart.data.datasets[0].data = scatterData;
+        const scatterClean = diversityClean.map((value, index) => ({
+            x: index,
+            y: value
+        }));
+        
+        pcnDiversityChart.data.datasets[0].data = scatterLeaked;  // With leakage
+        pcnDiversityChart.data.datasets[1].data = scatterClean;   // Without leakage
+        
         pcnDiversityChart.update();
     }
 }
@@ -438,11 +477,13 @@ async function startPCNExperiment() {
     if (pcnEnergyChart) {
         pcnEnergyChart.data.labels = [];
         pcnEnergyChart.data.datasets[0].data = [];
+        pcnEnergyChart.data.datasets[1].data = [];
         pcnEnergyChart.update();
     }
     
     if (pcnDiversityChart) {
         pcnDiversityChart.data.datasets[0].data = [];
+        pcnDiversityChart.data.datasets[1].data = [];
         pcnDiversityChart.update();
     }
     
