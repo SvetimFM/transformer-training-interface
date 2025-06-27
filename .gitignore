@@ -1,32 +1,134 @@
-# IDE and environment
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.env
+
+# IDE and development
 .history/
 .dependencies
 .claude
 .vscode/
 .idea/
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.pyc
-.venv/
-venv/
-env/
+*.swp
+*.swo
+*~
 
 # Model checkpoints and data
 checkpoints/
 *.pt
 *.pth
+*.h5
+*.pkl
+*.pickle
 metrics.json
+shakespeare.txt
+tiny_shakespeare.txt
 
-# Test files
+# Datasets
+data/
+datasets/
+
+# Outputs and results
+outputs/
+results/
+figures/
+logs/
+wandb/
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.pdf
+
+# Test and experimental files
 seven_head_nonsense.py
 test_*.py
+*_test.py
+*_experiment.py
+*_old.py
+*_backup.py
+
+# PCN specific
+pcn_experiments.json
+pcn_model_statedict.pth
+analysis/
+*.csv
+*.xlsx
+
+# Streamlit
+.streamlit/
 
 # OS files
 .DS_Store
 Thumbs.db
+Desktop.ini
+.Spotlight-V100
+.Trashes
 
 # Logs
 *.log
+*.out
+*.err
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Coverage and testing
+.coverage
+.pytest_cache/
+htmlcov/
+.tox/
+
+# Jupyter
+.ipynb_checkpoints
+*.ipynb
+
+# Documentation
+docs/_build/
+_build/
+_static/
+_templates/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# CUDA
+*.cu.o
+*.cudafe*
+*.cubin
+*.fatbin
+*.ptx
+
+# Python cache
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Environment variables
+.env.local
+.env.*.local
+
+# Package files
+*.tar.gz
+*.zip
+*.whl
+
+# Miscellaneous
+.cache/
+.mypy_cache/
+.hypothesis/
+node_modules/

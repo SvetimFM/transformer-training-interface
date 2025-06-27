@@ -25,6 +25,9 @@ from visualization.component_registry import component_registry
 from visualization.activation_tracker import activation_tracker
 from visualization.attention_capture import attention_capture
 
+# Import PCN managers
+from .pcn_manager import PCNExperimentManager, HybridModelManager
+
 app = FastAPI(title="Transformer Training UI")
 
 # Add CORS middleware
@@ -47,6 +50,10 @@ train_data = None
 val_data = None
 websocket_clients = []
 metrics_queue = queue.Queue()
+
+# PCN managers
+pcn_manager = None
+hybrid_manager = None
 
 # Request/Response models
 class ConfigUpdate(BaseModel):
@@ -394,6 +401,74 @@ async def get_lr_schedule():
         }
     else:
         return {"error": "Scheduler does not support schedule preview"}
+
+# PCN Experiment Endpoints
+@app.post("/api/pcn/start-experiment")
+async def start_pcn_experiment(config: dict):
+    """Start PCN data leakage experiment"""
+    global pcn_manager
+    
+    if pcn_manager is None:
+        # Create PCN manager with websocket callback
+        async def pcn_websocket_callback(data):
+            for client in websocket_clients:
+                try:
+                    await client.send_json(data)
+                except:
+                    pass
+        
+        pcn_manager = PCNExperimentManager(pcn_websocket_callback)
+    
+    await pcn_manager.start_pcn_experiment(config)
+    return {"status": "started", "experiment": "data_leakage"}
+
+@app.post("/api/pcn/stop-experiment")
+async def stop_pcn_experiment():
+    """Stop current PCN experiment"""
+    global pcn_manager
+    if pcn_manager:
+        await pcn_manager.stop_experiment()
+    return {"status": "stopped"}
+
+@app.get("/api/pcn/hybrid-architectures")
+async def get_hybrid_architectures():
+    """Get available hybrid architectures"""
+    return {
+        "architectures": [
+            {"id": "pcn-ff", "name": "PCN-FF: PCN replaces Feedforward"},
+            {"id": "alternating", "name": "Alternating: Attention ↔ PCN layers"},
+            {"id": "hierarchical", "name": "Hierarchical: PCN features → Transformer"},
+            {"id": "dual-stream", "name": "Dual-Stream: Parallel PCN + Transformer"},
+            {"id": "pcn-positional", "name": "PCN-Positional: Adaptive positional encoding"}
+        ]
+    }
+
+@app.post("/api/hybrid/start-training")
+async def start_hybrid_training(config: dict):
+    """Start hybrid model training"""
+    global hybrid_manager
+    
+    if hybrid_manager is None:
+        # Create hybrid manager with websocket callback
+        async def hybrid_websocket_callback(data):
+            for client in websocket_clients:
+                try:
+                    await client.send_json(data)
+                except:
+                    pass
+        
+        hybrid_manager = HybridModelManager(hybrid_websocket_callback)
+    
+    await hybrid_manager.start_training(config)
+    return {"status": "started", "architecture": config.get("architecture")}
+
+@app.post("/api/hybrid/stop-training")
+async def stop_hybrid_training():
+    """Stop hybrid model training"""
+    global hybrid_manager
+    if hybrid_manager:
+        await hybrid_manager.stop_training()
+    return {"status": "stopped"}
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

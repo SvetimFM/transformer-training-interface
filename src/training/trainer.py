@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 from torch.optim import AdamW
-from torch.amp import autocast, GradScaler
+from torch.amp import autocast
+from torch.cuda.amp import GradScaler
 import threading
 import time
 import os
@@ -60,7 +61,7 @@ class Trainer:
         self.optimizer = AdamW(model.parameters(), lr=config.training.learning_rate)
         
         # Initialize AMP scaler if enabled
-        self.scaler = GradScaler('cuda') if config.training.use_amp else None
+        self.scaler = GradScaler() if config.training.use_amp else None
         self.accumulation_steps = config.training.gradient_accumulation_steps
         
         # Calculate steps per epoch first
@@ -172,7 +173,7 @@ class Trainer:
                 
                 # Forward pass with AMP
                 if self.config.training.use_amp:
-                    with autocast('cuda'):
+                    with autocast(device_type='cuda'):
                         logits, loss = self.model(xb, yb)
                         # Scale loss for gradient accumulation
                         loss = loss / self.accumulation_steps

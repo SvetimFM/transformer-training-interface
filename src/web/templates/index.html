@@ -6,6 +6,7 @@
     <title>Transformer Training UI</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="/static/architecture.css">
+    <link rel="stylesheet" href="/static/pcn_styles.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
@@ -13,7 +14,18 @@
     <div class="container">
         <h1>Transformer Training Interface</h1>
         
-        <div class="main-grid">
+        <!-- Tab Navigation -->
+        <div class="tab-navigation">
+            <button class="tab-button active" data-tab="transformer">Standard Transformer</button>
+            <button class="tab-button" data-tab="pcn-experiments">PCN Experiments</button>
+            <button class="tab-button" data-tab="hybrid-models">Hybrid Models (WIP!)</button>
+        </div>
+        
+        <!-- Tab Content -->
+        <div class="tab-content">
+            <!-- Standard Transformer Tab -->
+            <div id="transformer-tab" class="tab-panel active">
+                <div class="main-grid">
             <!-- Training Control Panel -->
             <div class="panel" id="training-panel">
                 <h2>Training Control</h2>
@@ -58,11 +70,49 @@
                     <label>Layers: <span id="n-layers-value">1</span></label>
                     <input type="range" id="n-layers" min="1" max="12" value="1" class="slider">
                     
-                    <label>Heads: <span id="n-heads-value">8</span></label>
-                    <input type="range" id="n-heads" min="1" max="16" value="8" class="slider">
-                    
                     <label for="n-embed">Embed Dim: <span id="n-embed-value">256</span></label>
                     <input type="range" id="n-embed" min="64" max="1024" step="64" value="256" class="slider">
+                    
+                    <!-- Simple configuration for single layer -->
+                    <div id="simple-config" style="display: block;">
+                        <label>Heads: <span id="n-heads-value">8</span></label>
+                        <input type="range" id="n-heads" min="1" max="16" value="8" class="slider">
+                        
+                        <label>Hidden Multiplier: <span id="hidden-mult-value">4</span>x</label>
+                        <input type="range" id="hidden-mult" min="1" max="8" value="4" class="slider">
+                    </div>
+                    
+                    <!-- Per-layer configuration for multiple layers -->
+                    <div id="per-layer-config" style="display: none;">
+                        <h3>Per-Layer Configuration</h3>
+                        <p style="font-size: 12px; color: #9ca3af; margin-bottom: 10px;">
+                            Note: Transformer blocks use ReLU activation in their feedforward networks
+                        </p>
+                        <div id="layer-configs"></div>
+                    </div>
+                    
+                    <div class="param-info">
+                        <p>Total Parameters: <span id="total-params">0</span></p>
+                    </div>
+                </div>
+                
+                <h3>Output Layers Configuration</h3>
+                <div class="config-group">
+                    <label>Output Activation:</label>
+                    <select id="output-activation" class="form-select">
+                        <option value="gelu">GELU</option>
+                        <option value="relu">ReLU</option>
+                        <option value="silu">SiLU (Swish)</option>
+                        <option value="tanh">Tanh</option>
+                    </select>
+                    
+                    <label>Hidden Layers: <span id="n-output-layers-value">0</span></label>
+                    <input type="range" id="n-output-layers" min="0" max="5" value="0" class="slider">
+                    
+                    <div id="output-hidden-config" style="display: none;">
+                        <label>Hidden Dimension: <span id="output-hidden-dim-value">512</span></label>
+                        <input type="range" id="output-hidden-dim" min="128" max="4096" step="128" value="512" class="slider">
+                    </div>
                 </div>
                 
                 <button id="apply-architecture" class="btn btn-secondary">Apply Changes</button>
@@ -124,13 +174,17 @@
             <!-- Loss Chart -->
             <div class="panel chart-panel" id="loss-chart-panel">
                 <h2>Training Metrics</h2>
-                <canvas id="loss-chart"></canvas>
+                <div style="height: 300px; position: relative;">
+                    <canvas id="loss-chart"></canvas>
+                </div>
             </div>
             
             <!-- Learning Rate Schedule -->
             <div class="panel" id="lr-schedule-panel">
                 <h2>Learning Rate Schedule</h2>
-                <canvas id="lr-schedule-chart"></canvas>
+                <div style="height: 250px; position: relative;">
+                    <canvas id="lr-schedule-chart"></canvas>
+                </div>
                 <div class="lr-schedule-info">
                     <p>Current Phase: <span id="lr-phase">Not Started</span></p>
                     <p>Schedule Type: <span id="lr-schedule-type">Warmup + Cosine</span></p>
@@ -200,11 +254,217 @@
                 <div style="margin-top: 20px;">
                     <a href="/static/attention.html" class="btn btn-secondary">View Attention Patterns →</a>
                 </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- PCN Experiments Tab -->
+            <div id="pcn-experiments-tab" class="tab-panel">
+                <div class="main-grid">
+                    <!-- Data Leakage Demonstration Panel -->
+                    <div class="panel" id="pcn-leakage-panel">
+                        <h2>PCN Suspicious Accuracy Claims</h2>
+                        <div class="pcn-intro">
+                            <p>This experiment investigates the suspicious claims made in a recent Predictive Coding Network (PCN) paper.</p>
+                            <p><strong>Paper:</strong> <a href="https://arxiv.org/pdf/2506.06332" target="_blank">Introduction to Predictive Coding Networks for Machine Learning</a></p>
+                            <p><strong>Claim:</strong> The paper reports an extraordinary 99.92% accuracy on CIFAR-10 with only 4 epochs of training (4 minutes), which appears too good to be true for this challenging dataset.</p>
+                        </div>
+                        <div class="control-group">
+                            <button id="start-pcn-experiment" class="btn btn-primary">Run Comparison</button>
+                            <button id="stop-pcn-experiment" class="btn btn-secondary">Stop Experiment</button>
+                        </div>
+                        <div class="code-comparison">
+                            <h3>Critical Implementation Issue</h3>
+                            <div class="code-blocks">
+                                <div class="code-block">
+                                    <h4>❌ Problematic Implementation</h4>
+                                    <pre><code># test_generative uses labels during inference!
+def test_generative(pcn, x, y):
+    # This is cheating - y (labels) used in inference
+    pcn.infer(x, y, n_iter=50)
+    predictions = pcn.mus[-1]  # Get final layer activations
+    return accuracy(predictions, y)
+
+# Training reports 99.92% accuracy
+# but only because labels leak into test</code></pre>
+                                </div>
+                                <div class="code-block">
+                                    <h4>✅ Correct Implementation</h4>
+                                    <pre><code># Proper inference without labels
+def test_discriminative(pcn, x):
+    # No labels during inference
+    pcn.infer(x, n_iter=50)
+    predictions = pcn.mus[-1]
+    return predictions
+
+# Real accuracy: ~45% after 4 epochs
+# (which is expected for CIFAR-10)</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="comparison-metrics">
+                            <div class="metric-box">
+                                <h3>PCN (Paper's Claims)</h3>
+                                <p>Accuracy: <span id="pcn-accuracy-leaked">0.00%</span></p>
+                                <p>Training Time: <span id="pcn-train-time">4 min</span></p>
+                                <p>Epochs: <span id="pcn-epochs">4</span></p>
+                            </div>
+                            <div class="metric-box">
+                                <h3>Realistic PCN Performance</h3>
+                                <p>Accuracy: <span id="pcn-accuracy-clean">0.00%</span></p>
+                                <p>Expected Time: <span id="pcn-expected-time">2+ hours</span></p>
+                                <p>Expected Epochs: <span id="pcn-expected-epochs">100+</span></p>
+                            </div>
+                        </div>
+                        <div style="height: 300px; position: relative;">
+                            <canvas id="pcn-comparison-chart"></canvas>
+                        </div>
+                        
+                        <!-- Experiment Output Data -->
+                        <div class="experiment-outputs">
+                            <h3>Experiment Results</h3>
+                            <div class="output-grid">
+                                <div class="output-box">
+                                    <h4>With Label Leakage (Problematic)</h4>
+                                    <div class="output-content" id="pcn-output-leaked">
+                                        <p class="output-placeholder">Run experiment to see results...</p>
+                                    </div>
+                                </div>
+                                <div class="output-box">
+                                    <h4>Without Label Leakage (Correct)</h4>
+                                    <div class="output-content" id="pcn-output-clean">
+                                        <p class="output-placeholder">Run experiment to see results...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- PCN Exploration Analysis Panel -->
+                    <div class="panel" id="pcn-exploration-panel">
+                        <h2>PCN Exploration Analysis</h2>
+                        <div class="exploration-controls">
+                            <label>Number of Samples: <span id="pcn-samples-value">10</span></label>
+                            <input type="range" id="pcn-samples" min="1" max="50" value="10" class="slider">
+                            
+                            <label>Refinement Steps: <span id="pcn-refine-value">5</span></label>
+                            <input type="range" id="pcn-refine-steps" min="1" max="20" value="5" class="slider">
+                            
+                            <label>Noise Scale: <span id="pcn-noise-value">0.1</span></label>
+                            <input type="range" id="pcn-noise-scale" min="0.01" max="1.0" step="0.01" value="0.1" class="slider">
+                        </div>
+                        <div class="exploration-charts-vertical">
+                            <div class="chart-container">
+                                <h3>Energy Distribution</h3>
+                                <canvas id="pcn-energy-chart"></canvas>
+                            </div>
+                            <div class="chart-container">
+                                <h3>Diversity Scores</h3>
+                                <canvas id="pcn-diversity-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- PCN Results Panel -->
+                    <div class="panel" id="pcn-results-panel">
+                        <h2>Experiment Results</h2>
+                        <div class="results-summary">
+                            <h3>Key Findings</h3>
+                            <ul id="pcn-findings-list">
+                                <li>Run experiments to see results...</li>
+                            </ul>
+                        </div>
+                        <div class="scientific-implications">
+                            <h3>Scientific Implications</h3>
+                            <p id="pcn-implications">The claimed 99.92% CIFAR-10 accuracy with minimal training suggests potential issues: 
+                            data leakage, test set memorization, or evaluation errors. Such results contradict decades of deep learning research 
+                            showing CIFAR-10 requires substantial training for high accuracy.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Hybrid Models Tab -->
+            <div id="hybrid-models-tab" class="tab-panel">
+                <div class="main-grid">
+                    <!-- Architecture Selector Panel -->
+                    <div class="panel" id="hybrid-arch-panel">
+                        <h2>Hybrid Architecture Selection</h2>
+                        <div class="arch-selector">
+                            <label>Select Architecture:</label>
+                            <select id="hybrid-architecture" class="form-select">
+                                <option value="pcn-ff">PCN-FF: PCN replaces Feedforward</option>
+                                <option value="alternating">Alternating: Attention ↔ PCN layers</option>
+                                <option value="hierarchical">Hierarchical: PCN features → Transformer</option>
+                                <option value="dual-stream">Dual-Stream: Parallel PCN + Transformer</option>
+                                <option value="pcn-positional">PCN-Positional: Adaptive positional encoding</option>
+                            </select>
+                            <div class="arch-description" id="arch-description">
+                                <p>Select an architecture to see its description and diagram.</p>
+                            </div>
+                        </div>
+                        <div id="hybrid-arch-diagram"></div>
+                    </div>
+                    
+                    <!-- Hybrid Training Configuration -->
+                    <div class="panel" id="hybrid-config-panel">
+                        <h2>Hybrid Model Configuration</h2>
+                        <div class="config-group">
+                            <h3>PCN-Specific Parameters</h3>
+                            <label>PCN Learning Rate: <span id="pcn-lr-value">0.01</span></label>
+                            <input type="range" id="pcn-learning-rate" min="0.001" max="0.1" step="0.001" value="0.01" class="slider">
+                            
+                            <label>Inference Steps: <span id="pcn-inference-value">10</span></label>
+                            <input type="range" id="pcn-inference-steps" min="1" max="50" value="10" class="slider">
+                            
+                            <label>Energy Threshold: <span id="pcn-threshold-value">0.01</span></label>
+                            <input type="range" id="pcn-energy-threshold" min="0.001" max="0.1" step="0.001" value="0.01" class="slider">
+                            
+                            <label class="switch-label">
+                                <input type="checkbox" id="use-pcn-exploration" class="toggle-switch" checked>
+                                <span>Enable PCN Exploration</span>
+                            </label>
+                        </div>
+                        <button id="start-hybrid-training" class="btn btn-primary">Start Hybrid Training</button>
+                        <button id="stop-hybrid-training" class="btn btn-secondary">Stop Training</button>
+                    </div>
+                    
+                    <!-- Performance Comparison Panel -->
+                    <div class="panel chart-panel" id="hybrid-comparison-panel">
+                        <h2>Performance Comparison</h2>
+                        <div class="comparison-controls">
+                            <label class="switch-label">
+                                <input type="checkbox" id="show-baseline" class="toggle-switch" checked>
+                                <span>Show Standard Transformer Baseline</span>
+                            </label>
+                            <label class="switch-label">
+                                <input type="checkbox" id="show-efficiency" class="toggle-switch">
+                                <span>Show Efficiency Metrics</span>
+                            </label>
+                        </div>
+                        <div style="height: 400px; position: relative;">
+                            <canvas id="hybrid-performance-chart"></canvas>
+                        </div>
+                        <div class="performance-metrics">
+                            <div class="metric-box">
+                                <h3>Hybrid Model</h3>
+                                <p>Loss: <span id="hybrid-loss">-</span></p>
+                                <p>Perplexity: <span id="hybrid-perplexity">-</span></p>
+                            </div>
+                            <div class="metric-box">
+                                <h3>Standard Transformer</h3>
+                                <p>Loss: <span id="baseline-loss">-</span></p>
+                                <p>Perplexity: <span id="baseline-perplexity">-</span></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
     
     <script src="/static/architecture.js"></script>
     <script src="/static/main.js"></script>
+    <script src="/static/pcn_visualizations.js"></script>
 </body>
 </html>

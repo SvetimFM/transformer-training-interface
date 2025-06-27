@@ -1,19 +1,42 @@
+# PyTorch with CUDA support
 torch==2.5.1+cu121
 torchvision==0.20.1+cu121
 torchaudio==2.5.1+cu121
 --index-url https://download.pytorch.org/whl/cu121
+
+# Core dependencies
 numpy==2.1.2
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
 websockets==14.1
 pydantic==2.10.5
+
+# Web framework
 python-multipart==0.0.20
-streamlit==1.40.2
-pandas==2.2.3
+aiofiles>=23.0.0
+
+# Data visualization
+matplotlib>=3.7.0
 plotly==5.24.1
+pandas==2.2.3
+
+# Optional UI (Streamlit)
+streamlit==1.40.2
+
+# Transformer ecosystem
 transformers==4.46.3
 accelerate==1.2.1
 bitsandbytes==0.45.0
 sentencepiece==0.2.0
 safetensors==0.4.5
 datasets==3.2.0
+
+# Utilities
+tqdm>=4.66.0
+rich>=13.0.0
+
+# Development tools (optional)
+# pytest>=7.4.0
+# pytest-asyncio>=0.21.0
+# black>=23.0.0
+# flake8>=6.0.0

@@ -13,6 +13,11 @@ class ModelConfig(BaseModel):
     use_residual: bool = False
     norm_position: str = "pre"  # "pre" or "post"
     
+    # Output layer configuration
+    output_activation: str = "gelu"  # "relu", "gelu", "silu", "tanh"
+    n_output_layers: int = 0  # Number of hidden layers after transformer blocks
+    output_hidden_dim: int = 512  # Dimension of output hidden layers
+    
     class Config:
         validate_assignment = True
 

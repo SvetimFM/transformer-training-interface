@@ -162,6 +162,48 @@ h1 {
     cursor: pointer;
 }
 
+/* Per-layer configuration styles */
+#per-layer-config h3 {
+    margin-top: 15px;
+    margin-bottom: 10px;
+    color: #4a9eff;
+    font-size: 1.1em;
+}
+
+.layer-config-item {
+    background-color: #1a1a1a;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 6px;
+    border: 1px solid #444;
+}
+
+.layer-config-item h4 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #4a9eff;
+}
+
+.layer-config-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.param-info {
+    margin-top: 15px;
+    padding: 10px;
+    background-color: #1a1a1a;
+    border-radius: 6px;
+    text-align: center;
+}
+
+.param-info p {
+    margin: 0;
+    font-weight: bold;
+    color: #4a9eff;
+}
+
 .input-group {
     margin-bottom: 20px;
 }
@@ -173,13 +215,21 @@ h1 {
 }
 
 .input-group input[type="text"],
-.input-group input[type="number"] {
+.input-group input[type="number"],
+.input-group select,
+.form-select {
     width: 100%;
     padding: 8px;
     background-color: #333;
     border: 1px solid #555;
     border-radius: 4px;
     color: #e0e0e0;
+}
+
+.form-select:focus,
+.input-group select:focus {
+    outline: none;
+    border-color: #4a9eff;
 }
 
 .output-box {

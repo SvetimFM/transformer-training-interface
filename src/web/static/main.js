@@ -5,6 +5,294 @@ let currentConfig = {};
 let architectureViz = null;
 let animationsEnabled = true;
 
+// Tab switching functionality
+function initTabSwitching() {
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabPanels = document.querySelectorAll('.tab-panel');
+    
+    tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const targetTab = button.getAttribute('data-tab');
+            
+            // Update active states
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            tabPanels.forEach(panel => panel.classList.remove('active'));
+            
+            button.classList.add('active');
+            document.getElementById(`${targetTab}-tab`).classList.add('active');
+            
+            // Initialize tab-specific content if needed
+            if (targetTab === 'pcn-experiments') {
+                initPCNExperiments();
+            } else if (targetTab === 'hybrid-models') {
+                initHybridModels();
+            }
+        });
+    });
+}
+
+// Initialize PCN Experiments tab
+function initPCNExperiments() {
+    // Initialize PCN charts if they haven't been created yet
+    if (typeof initPCNCharts === 'function') {
+        initPCNCharts();
+    }
+}
+
+// Initialize Hybrid Models tab
+function initHybridModels() {
+    // Initialize hybrid architecture visualization
+    if (typeof initHybridArchitecture === 'function') {
+        initHybridArchitecture();
+    }
+    
+    // Update architecture description on selection change
+    const archSelector = document.getElementById('hybrid-architecture');
+    if (archSelector && !archSelector.hasListener) {
+        archSelector.hasListener = true;
+        archSelector.addEventListener('change', updateArchitectureDescription);
+    }
+}
+
+// Update architecture description based on selection
+function updateArchitectureDescription() {
+    const archSelector = document.getElementById('hybrid-architecture');
+    const descriptionDiv = document.getElementById('arch-description');
+    
+    const descriptions = {
+        'pcn-ff': 'PCN replaces the feedforward networks in transformer blocks, bringing biological plausibility to the computation-heavy MLP layers.',
+        'alternating': 'Alternates between attention and PCN layers, allowing each mechanism to specialize in different aspects of sequence processing.',
+        'hierarchical': 'PCN processes features at a lower level, then passes refined representations to the transformer for sequence modeling.',
+        'dual-stream': 'Runs PCN and transformer in parallel streams, combining their outputs for richer representations.',
+        'pcn-positional': 'Uses PCN to learn adaptive positional encodings that adjust based on the input context.'
+    };
+    
+    descriptionDiv.innerHTML = `<p>${descriptions[archSelector.value] || 'Select an architecture to see its description.'}</p>`;
+}
+
+// Update layer configuration based on number of layers
+function updateLayerConfig(numLayers) {
+    const simpleConfig = document.getElementById('simple-config');
+    const perLayerConfig = document.getElementById('per-layer-config');
+    const layerConfigs = document.getElementById('layer-configs');
+    
+    if (numLayers === 1) {
+        simpleConfig.style.display = 'block';
+        perLayerConfig.style.display = 'none';
+    } else {
+        simpleConfig.style.display = 'none';
+        perLayerConfig.style.display = 'block';
+        
+        // Generate per-layer configuration
+        layerConfigs.innerHTML = '';
+        
+        // Get current embed dimension for head validation
+        const embedDim = parseInt(document.getElementById('n-embed').value);
+        const maxHeads = Math.floor(embedDim / 4); // Minimum head size of 4
+        
+        for (let i = 0; i < numLayers; i++) {
+            const layerDiv = document.createElement('div');
+            layerDiv.className = 'layer-config-item';
+            layerDiv.innerHTML = `
+                <h4>Layer ${i + 1}</h4>
+                <div class="layer-config-grid">
+                    <div>
+                        <label>Heads: <span id="layer-${i}-heads-value">8</span></label>
+                        <input type="range" id="layer-${i}-heads" min="1" max="${Math.min(maxHeads, 16)}" value="${Math.min(8, maxHeads)}" 
+                               class="slider layer-heads" data-layer="${i}">
+                    </div>
+                    <div>
+                        <label>Hidden: <span id="layer-${i}-hidden-value">4</span>x</label>
+                        <input type="range" id="layer-${i}-hidden" min="1" max="8" value="4" 
+                               class="slider layer-hidden" data-layer="${i}">
+                    </div>
+                </div>
+            `;
+            layerConfigs.appendChild(layerDiv);
+        }
+        
+        // Add event listeners to new sliders
+        document.querySelectorAll('.layer-heads').forEach(slider => {
+            slider.addEventListener('input', (e) => {
+                const layer = e.target.dataset.layer;
+                document.getElementById(`layer-${layer}-heads-value`).textContent = e.target.value;
+                calculateTotalParams();
+            });
+        });
+        
+        document.querySelectorAll('.layer-hidden').forEach(slider => {
+            slider.addEventListener('input', (e) => {
+                const layer = e.target.dataset.layer;
+                document.getElementById(`layer-${layer}-hidden-value`).textContent = e.target.value;
+                calculateTotalParams();
+            });
+        });
+    }
+}
+
+// Calculate total parameters
+function calculateTotalParams() {
+    try {
+        // Avoid race condition - ensure config is loaded
+        if (!currentConfig.model) return;
+        
+        const vocabSize = currentConfig.model?.vocab_size || 50000;
+        const embedDim = parseInt(document.getElementById('n-embed').value);
+        const numLayers = parseInt(document.getElementById('n-layers').value);
+        
+        let totalParams = 0;
+        
+        // Embedding parameters
+        totalParams += vocabSize * embedDim; // Token embeddings
+        totalParams += (currentConfig.model?.block_size || 128) * embedDim; // Position embeddings
+        
+        // Layer parameters
+        if (numLayers === 1) {
+            const hiddenMult = parseInt(document.getElementById('hidden-mult').value);
+            
+            // Attention parameters (Q, K, V, O projections)
+            totalParams += 4 * embedDim * embedDim;
+            
+            // FFN parameters
+            totalParams += embedDim * (hiddenMult * embedDim); // First linear
+            totalParams += (hiddenMult * embedDim) * embedDim; // Second linear
+            
+            // Layer norm parameters (2 per layer)
+            totalParams += 2 * embedDim;
+        } else {
+            for (let i = 0; i < numLayers; i++) {
+                const hiddenMult = parseInt(document.getElementById(`layer-${i}-hidden`)?.value || 4);
+                
+                // Attention parameters
+                totalParams += 4 * embedDim * embedDim;
+                
+                // FFN parameters
+                totalParams += embedDim * (hiddenMult * embedDim);
+                totalParams += (hiddenMult * embedDim) * embedDim;
+                
+                // Layer norm parameters
+                totalParams += 2 * embedDim;
+            }
+        }
+        
+        // Final layer norm
+        totalParams += embedDim; // Final layer norm
+        
+        // Output layers
+        const numOutputLayers = parseInt(document.getElementById('n-output-layers').value);
+        const outputHiddenDim = parseInt(document.getElementById('output-hidden-dim').value);
+        
+        if (numOutputLayers > 0) {
+            // First output layer: embedDim -> outputHiddenDim
+            totalParams += embedDim * outputHiddenDim;
+            
+            // Additional hidden layers: outputHiddenDim -> outputHiddenDim
+            for (let i = 1; i < numOutputLayers; i++) {
+                totalParams += outputHiddenDim * outputHiddenDim;
+            }
+            
+            // Final projection: outputHiddenDim -> vocabSize
+            totalParams += outputHiddenDim * vocabSize;
+        } else {
+            // Direct projection: embedDim -> vocabSize
+            totalParams += embedDim * vocabSize;
+        }
+        
+        // Format the number with commas
+        const formatted = totalParams.toLocaleString();
+        document.getElementById('total-params').textContent = formatted;
+    } catch (error) {
+        console.error('Error calculating parameters:', error);
+        const paramsElement = document.getElementById('total-params');
+        if (paramsElement) {
+            paramsElement.textContent = 'Error';
+        }
+    }
+}
+
+// PCN WebSocket handlers
+function updatePCNMetrics(data) {
+    if (data.experiment === 'data_leakage') {
+        // Update accuracy displays (with null checks)
+        const accuracyLeaked = document.getElementById('pcn-accuracy-leaked');
+        const accuracyClean = document.getElementById('pcn-accuracy-clean');
+        const stepsLeaked = document.getElementById('pcn-steps-leaked');
+        const stepsClean = document.getElementById('pcn-steps-clean');
+        
+        if (accuracyLeaked) accuracyLeaked.textContent = data.accuracy_claimed.toFixed(2) + '%';
+        if (accuracyClean) accuracyClean.textContent = data.accuracy_realistic.toFixed(2) + '%';
+        if (stepsLeaked) stepsLeaked.textContent = data.inference_steps;
+        if (stepsClean) stepsClean.textContent = data.inference_steps;
+        
+        // Update comparison chart
+        if (typeof updatePCNComparison === 'function') {
+            updatePCNComparison(data.accuracy_claimed, data.accuracy_realistic, data.epoch);
+        }
+        
+        // Update experiment outputs
+        const leakedOutput = document.getElementById('pcn-output-leaked');
+        const cleanOutput = document.getElementById('pcn-output-clean');
+        
+        if (leakedOutput) {
+            leakedOutput.innerHTML = `
+                <div class="output-metric"><strong>Epoch:</strong> ${data.epoch + 1}</div>
+                <div class="output-metric"><strong>Accuracy:</strong> ${data.accuracy_claimed.toFixed(2)}%</div>
+                <div class="output-metric"><strong>Method:</strong> test_generative(x, y)</div>
+                <div class="output-metric"><strong>Issue:</strong> Labels used during inference</div>
+                <div class="output-metric"><strong>Result:</strong> Artificially high accuracy</div>
+            `;
+        }
+        
+        if (cleanOutput) {
+            cleanOutput.innerHTML = `
+                <div class="output-metric"><strong>Epoch:</strong> ${data.epoch + 1}</div>
+                <div class="output-metric"><strong>Accuracy:</strong> ${data.accuracy_realistic.toFixed(2)}%</div>
+                <div class="output-metric"><strong>Method:</strong> test_discriminative(x)</div>
+                <div class="output-metric"><strong>Issue:</strong> None - proper evaluation</div>
+                <div class="output-metric"><strong>Result:</strong> Realistic accuracy for CIFAR-10</div>
+            `;
+        }
+        
+        // Update findings
+        const findingsList = document.getElementById('pcn-findings-list');
+        if (findingsList && data.accuracy_claimed > 90 && data.accuracy_realistic < 60) {
+            findingsList.innerHTML = `
+                <li>With label leakage: ${data.accuracy_claimed.toFixed(1)}% accuracy (matching paper claims)</li>
+                <li>Without label leakage: ${data.accuracy_realistic.toFixed(1)}% accuracy (actual performance)</li>
+                <li>Performance gap: ${(data.accuracy_claimed - data.accuracy_realistic).toFixed(1)}% difference</li>
+                <li>Conclusion: PCN's claimed performance relies on unrealistic test conditions</li>
+            `;
+        }
+    }
+}
+
+function updatePCNExploration(data) {
+    // Update energy chart
+    if (typeof updatePCNEnergy === 'function' && data.energy) {
+        updatePCNEnergy(data.energy);
+    }
+    
+    // Update diversity chart
+    if (typeof updatePCNDiversity === 'function' && data.diversity) {
+        updatePCNDiversity(data.diversity);
+    }
+}
+
+function updateHybridMetrics(data) {
+    // Update loss displays
+    document.getElementById('hybrid-loss').textContent = data.hybrid_loss.toFixed(4);
+    document.getElementById('hybrid-perplexity').textContent = data.hybrid_perplexity.toFixed(2);
+    document.getElementById('baseline-loss').textContent = data.baseline_loss.toFixed(4);
+    document.getElementById('baseline-perplexity').textContent = data.baseline_perplexity.toFixed(2);
+    
+    // Update performance chart
+    if (typeof updateHybridPerformance === 'function') {
+        updateHybridPerformance(data.hybrid_loss, data.baseline_loss);
+    }
+    
+    // Bio-plausibility removed - not meaningful for this project
+}
+
 // Initialize WebSocket connection
 function initWebSocket() {
     const wsUrl = `ws://${window.location.host}/ws`;
@@ -28,6 +316,12 @@ function initWebSocket() {
                 handleTrainingComplete(data.data);
             } else if (data.type === 'activation_update') {
                 updateActivations(data.data);
+            } else if (data.type === 'pcn_metrics') {
+                updatePCNMetrics(data.data);
+            } else if (data.type === 'pcn_exploration') {
+                updatePCNExploration(data.data);
+            } else if (data.type === 'hybrid_metrics') {
+                updateHybridMetrics(data.data);
             }
         } catch (error) {
             console.error('Error parsing WebSocket message:', error);
@@ -215,6 +509,8 @@ async function loadConfig() {
         const response = await fetch('/api/config');
         currentConfig = await response.json();
         updateConfigUI(currentConfig);
+        // Calculate total params after config is loaded
+        calculateTotalParams();
     } catch (error) {
         console.error('Failed to load config:', error);
     }
@@ -242,6 +538,21 @@ function updateConfigUI(config) {
         document.getElementById('train-steps').value = config.training.train_steps;
     }
     document.getElementById('total-epochs').textContent = config.training.epochs;
+    
+    // Output layer configuration
+    if (config.model.output_activation) {
+        document.getElementById('output-activation').value = config.model.output_activation;
+    }
+    if (config.model.n_output_layers !== undefined) {
+        document.getElementById('n-output-layers').value = config.model.n_output_layers;
+        document.getElementById('n-output-layers-value').textContent = config.model.n_output_layers;
+        document.getElementById('output-hidden-config').style.display = 
+            config.model.n_output_layers > 0 ? 'block' : 'none';
+    }
+    if (config.model.output_hidden_dim !== undefined) {
+        document.getElementById('output-hidden-dim').value = config.model.output_hidden_dim;
+        document.getElementById('output-hidden-dim-value').textContent = config.model.output_hidden_dim;
+    }
     
     // LR scheduler settings
     if (config.training.scheduler_type) {
@@ -605,6 +916,14 @@ document.addEventListener('DOMContentLoaded', () => {
     loadConfig();
     initArchitectureVisualization();
     
+    // Initialize tab switching
+    initTabSwitching();
+    
+    // Initialize PCN charts on page load
+    if (typeof initPCNCharts === 'function') {
+        initPCNCharts();
+    }
+    
     // Load metrics history
     loadMetricsHistory();
     
@@ -682,7 +1001,10 @@ document.addEventListener('DOMContentLoaded', () => {
             norm_position: document.querySelector('input[name="norm-position"]:checked').value,
             n_layers: parseInt(document.getElementById('n-layers').value),
             n_heads: n_heads,
-            n_embed: n_embed
+            n_embed: n_embed,
+            output_activation: document.getElementById('output-activation').value,
+            n_output_layers: parseInt(document.getElementById('n-output-layers').value),
+            output_hidden_dim: parseInt(document.getElementById('output-hidden-dim').value)
         };
         
         try {
@@ -802,20 +1124,51 @@ document.addEventListener('DOMContentLoaded', () => {
     // Sliders
     document.getElementById('n-layers').addEventListener('input', (e) => {
         document.getElementById('n-layers-value').textContent = e.target.value;
+        updateLayerConfig(parseInt(e.target.value));
+        calculateTotalParams();
     });
     
     document.getElementById('n-heads').addEventListener('input', (e) => {
         document.getElementById('n-heads-value').textContent = e.target.value;
         updateHeadSizeDisplay();
+        calculateTotalParams();
     });
     
     document.getElementById('n-embed').addEventListener('input', (e) => {
         document.getElementById('n-embed-value').textContent = e.target.value;
         updateHeadSizeDisplay();
+        calculateTotalParams();
     });
+    
+    // Hidden layer multiplier
+    document.getElementById('hidden-mult').addEventListener('input', (e) => {
+        document.getElementById('hidden-mult-value').textContent = e.target.value;
+        calculateTotalParams();
+    });
+    
+    
+    // Output layer controls
+    document.getElementById('n-output-layers').addEventListener('input', (e) => {
+        const numOutputLayers = parseInt(e.target.value);
+        document.getElementById('n-output-layers-value').textContent = numOutputLayers;
+        
+        // Show/hide hidden dimension control
+        const hiddenConfig = document.getElementById('output-hidden-config');
+        hiddenConfig.style.display = numOutputLayers > 0 ? 'block' : 'none';
+        
+        calculateTotalParams();
+    });
+    
+    document.getElementById('output-hidden-dim').addEventListener('input', (e) => {
+        document.getElementById('output-hidden-dim-value').textContent = e.target.value;
+        calculateTotalParams();
+    });
+    
+    document.getElementById('output-activation').addEventListener('change', calculateTotalParams);
     
     // Initial validation display
     updateHeadSizeDisplay();
+    // calculateTotalParams() is called after config loads to avoid race condition
     
     document.getElementById('max-tokens').addEventListener('input', (e) => {
         document.getElementById('max-tokens-value').textContent = e.target.value;
