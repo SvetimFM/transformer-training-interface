@@ -1,5 +1,5 @@
-from models.transformer_block import TransformerBlock
-from models.normalization import LayerNorm
+from .transformer_block import TransformerBlock
+from .normalization import LayerNorm
 import torch
 import torch.nn as nn
 from torch.nn import functional as F

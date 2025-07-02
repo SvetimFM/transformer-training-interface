@@ -17,18 +17,107 @@
         <!-- Tab Navigation -->
         <div class="tab-navigation">
             <button class="tab-button active" data-tab="transformer">Standard Transformer</button>
-            <button class="tab-button" data-tab="pcn-experiments">PCN Experiments</button>
-            <button class="tab-button" data-tab="hybrid-models">Hybrid Models (WIP!)</button>
+            <div class="dropdown">
+                <button class="dropdown-button">Experiments ▼</button>
+                <div class="dropdown-content">
+                    <button class="tab-button" data-tab="pcn-experiments">PCN Experiments</button>
+                    <button class="tab-button" data-tab="hybrid-models">Hybrid Models (WIP!)</button>
+                    <button class="tab-button" data-tab="multi-lora">Multi-LoRA (WIP!)</button>
+                </div>
+            </div>
         </div>
         
         <!-- Tab Content -->
         <div class="tab-content">
             <!-- Standard Transformer Tab -->
             <div id="transformer-tab" class="tab-panel active">
+                <!-- Scientific Explainer -->
+                <div class="scientific-explainer">
+                    <h2>Understanding Transformers</h2>
+                    <p>
+                        Transformers are neural architectures that revolutionized machine learning through <strong>self-attention mechanisms</strong>. 
+                        Unlike RNNs, they process sequences in parallel, computing relationships between all positions simultaneously.
+                    </p>
+                    <div class="explainer-grid">
+                        <div class="explainer-item">
+                            <h3>🧠 Self-Attention</h3>
+                            <p>Computes weighted relationships between all tokens in a sequence, allowing the model to focus on relevant context regardless of distance.</p>
+                        </div>
+                        <div class="explainer-item">
+                            <h3>📊 Multi-Head Attention</h3>
+                            <p>Parallel attention mechanisms that capture different types of relationships (syntactic, semantic, positional) simultaneously.</p>
+                        </div>
+                        <div class="explainer-item">
+                            <h3>🔄 Residual Connections</h3>
+                            <p>Skip connections that help gradients flow and allow the model to learn identity mappings when needed.</p>
+                        </div>
+                        <div class="explainer-item">
+                            <h3>📐 Layer Normalization</h3>
+                            <p>Stabilizes training by normalizing activations across features, crucial for deep transformer architectures.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Shakespeare Recipe -->
+                <div class="recipe-section">
+                    <h3>🎭 Tiny Shakespeare Recipe</h3>
+                    <p>The dataset contains ~1M characters of Shakespeare's works. Here's a proven recipe to get started:</p>
+                    <div class="recipe-grid">
+                        <div class="recipe-card">
+                            <h4>Beginner (Fast Training)</h4>
+                            <ul>
+                                <li><strong>Layers:</strong> 2</li>
+                                <li><strong>Embed Dim:</strong> 128</li>
+                                <li><strong>Heads:</strong> 4</li>
+                                <li><strong>Batch Size:</strong> 64</li>
+                                <li><strong>Learning Rate:</strong> 3e-4</li>
+                                <li><strong>Epochs:</strong> 5-10</li>
+                            </ul>
+                            <p class="recipe-note">~300K params, trains in minutes</p>
+                        </div>
+                        <div class="recipe-card">
+                            <h4>Intermediate (Better Quality)</h4>
+                            <ul>
+                                <li><strong>Layers:</strong> 4</li>
+                                <li><strong>Embed Dim:</strong> 256</li>
+                                <li><strong>Heads:</strong> 8</li>
+                                <li><strong>Batch Size:</strong> 32</li>
+                                <li><strong>Learning Rate:</strong> 2e-4</li>
+                                <li><strong>Epochs:</strong> 10-20</li>
+                            </ul>
+                            <p class="recipe-note">~2.5M params, good results</p>
+                        </div>
+                        <div class="recipe-card">
+                            <h4>Advanced (Best Quality)</h4>
+                            <ul>
+                                <li><strong>Layers:</strong> 6</li>
+                                <li><strong>Embed Dim:</strong> 384</li>
+                                <li><strong>Heads:</strong> 6</li>
+                                <li><strong>Batch Size:</strong> 16</li>
+                                <li><strong>Learning Rate:</strong> 1e-4</li>
+                                <li><strong>Epochs:</strong> 20-30</li>
+                            </ul>
+                            <p class="recipe-note">~10M params, authentic Shakespeare</p>
+                        </div>
+                    </div>
+                    <div class="recipe-tips">
+                        <h4>💡 Tips for Success</h4>
+                        <ul>
+                            <li>Enable <strong>Layer Norm</strong> and <strong>Residual Connections</strong> for stable training</li>
+                            <li>Use <strong>Pre-norm</strong> position for better stability</li>
+                            <li>Keep <strong>Torch Compile</strong> and <strong>Mixed Precision</strong> enabled for speed</li>
+                            <li>Watch for loss < 1.5 for coherent text generation</li>
+                            <li>Temperature 0.8-1.0 works well for Shakespeare-style text</li>
+                        </ul>
+                    </div>
+                </div>
+                
                 <div class="main-grid">
             <!-- Training Control Panel -->
             <div class="panel" id="training-panel">
-                <h2>Training Control</h2>
+                <h2 class="tooltip">Training Control
+                    <span class="tooltiptext">Start, stop, and monitor training progress. Shows real-time metrics and GPU usage.</span>
+                </h2>
                 <div class="control-group">
                     <button id="start-training" class="btn btn-primary">Start Training</button>
                     <button id="stop-training" class="btn btn-secondary">Stop Training</button>
@@ -49,36 +138,49 @@
             
             <!-- Architecture Configuration -->
             <div class="panel" id="arch-panel">
-                <h2>Model Architecture</h2>
+                <h2 class="tooltip">Model Architecture
+                    <span class="tooltiptext">Configure transformer layers, attention heads, and embedding dimensions. Start simple with 1-2 layers.</span>
+                </h2>
                 <div class="config-group">
-                    <label class="switch-label">
+                    <label class="switch-label tooltip">
                         <input type="checkbox" id="use-layer-norm" class="toggle-switch">
                         <span>Layer Normalization</span>
+                        <span class="tooltiptext">Normalizes layer outputs to stabilize training. Essential for deep networks, prevents gradient explosion.</span>
                     </label>
-                    <label class="switch-label">
+                    <label class="switch-label tooltip">
                         <input type="checkbox" id="use-residual" class="toggle-switch">
                         <span>Residual Connections</span>
+                        <span class="tooltiptext">Adds input directly to output (x + F(x)). Enables training of very deep networks by mitigating vanishing gradients.</span>
                     </label>
-                    <div class="radio-group">
+                    <div class="radio-group tooltip">
                         <label>Norm Position:</label>
                         <label><input type="radio" name="norm-position" value="pre" checked> Pre</label>
                         <label><input type="radio" name="norm-position" value="post"> Post</label>
+                        <span class="tooltiptext">Pre-norm: LayerNorm before sublayers (more stable). Post-norm: LayerNorm after (original paper, may need warmup).</span>
                     </div>
                 </div>
                 
                 <div class="slider-group">
-                    <label>Layers: <span id="n-layers-value">1</span></label>
+                    <label class="tooltip">Layers: <span id="n-layers-value">1</span>
+                        <span class="tooltiptext">Number of transformer blocks. More layers = more capacity but slower training. Start with 1-4 for experiments.</span>
+                    </label>
                     <input type="range" id="n-layers" min="1" max="12" value="1" class="slider">
                     
-                    <label for="n-embed">Embed Dim: <span id="n-embed-value">256</span></label>
+                    <label for="n-embed" class="tooltip">Embed Dim: <span id="n-embed-value">256</span>
+                        <span class="tooltiptext">Dimensionality of token embeddings and hidden states. Must be divisible by number of attention heads.</span>
+                    </label>
                     <input type="range" id="n-embed" min="64" max="1024" step="64" value="256" class="slider">
                     
                     <!-- Simple configuration for single layer -->
                     <div id="simple-config" style="display: block;">
-                        <label>Heads: <span id="n-heads-value">8</span></label>
+                        <label class="tooltip">Heads: <span id="n-heads-value">8</span>
+                            <span class="tooltiptext">Number of parallel attention heads. Each head learns different relationships. Typical: 8-16 heads.</span>
+                        </label>
                         <input type="range" id="n-heads" min="1" max="16" value="8" class="slider">
                         
-                        <label>Hidden Multiplier: <span id="hidden-mult-value">4</span>x</label>
+                        <label class="tooltip">Hidden Multiplier: <span id="hidden-mult-value">4</span>x
+                            <span class="tooltiptext">FFN hidden size = embed_dim × multiplier. Standard is 4x. Larger = more capacity but more compute.</span>
+                        </label>
                         <input type="range" id="hidden-mult" min="1" max="8" value="4" class="slider">
                     </div>
                     
@@ -98,7 +200,9 @@
                 
                 <h3>Output Layers Configuration</h3>
                 <div class="config-group">
-                    <label>Output Activation:</label>
+                    <label class="tooltip">Output Activation:
+                        <span class="tooltiptext">Activation function for output projection layers. GELU is smooth and performs well in transformers.</span>
+                    </label>
                     <select id="output-activation" class="form-select">
                         <option value="gelu">GELU</option>
                         <option value="relu">ReLU</option>
@@ -106,11 +210,15 @@
                         <option value="tanh">Tanh</option>
                     </select>
                     
-                    <label>Hidden Layers: <span id="n-output-layers-value">0</span></label>
+                    <label class="tooltip">Hidden Layers: <span id="n-output-layers-value">0</span>
+                        <span class="tooltiptext">Additional feedforward layers after transformer. 0 = direct projection to vocab. More layers can help with complex mappings.</span>
+                    </label>
                     <input type="range" id="n-output-layers" min="0" max="5" value="0" class="slider">
                     
                     <div id="output-hidden-config" style="display: none;">
-                        <label>Hidden Dimension: <span id="output-hidden-dim-value">512</span></label>
+                        <label class="tooltip">Hidden Dimension: <span id="output-hidden-dim-value">512</span>
+                            <span class="tooltiptext">Size of hidden layers in output projection. Typically between embed_dim and 2x embed_dim.</span>
+                        </label>
                         <input type="range" id="output-hidden-dim" min="128" max="4096" step="128" value="512" class="slider">
                     </div>
                 </div>
@@ -120,21 +228,33 @@
             
             <!-- Training Parameters -->
             <div class="panel" id="params-panel">
-                <h2>Training Parameters</h2>
+                <h2 class="tooltip">Training Parameters
+                    <span class="tooltiptext">Set learning rate, batch size, and optimization settings. These control how the model learns.</span>
+                </h2>
                 <div class="input-group">
-                    <label>Learning Rate:</label>
+                    <label class="tooltip">Learning Rate:
+                        <span class="tooltiptext">Step size for gradient descent. Start with 3e-4 for small models. Lower for larger models or if training is unstable.</span>
+                    </label>
                     <input type="number" id="learning-rate" value="0.0003" step="0.0001" min="0.00001" max="0.1">
                     
-                    <label>Batch Size:</label>
+                    <label class="tooltip">Batch Size:
+                        <span class="tooltiptext">Number of sequences per gradient update. Larger = more stable but more memory. Power of 2 is optimal for GPUs.</span>
+                    </label>
                     <input type="number" id="batch-size" value="64" min="1" max="256">
                     
-                    <label>Epochs:</label>
+                    <label class="tooltip">Epochs:
+                        <span class="tooltiptext">Number of complete passes through the dataset. More epochs risk overfitting on small datasets.</span>
+                    </label>
                     <input type="number" id="epochs" value="10" min="1" max="100">
                     
-                    <label>Training Steps (optional):</label>
+                    <label class="tooltip">Training Steps (optional):
+                        <span class="tooltiptext">Total gradient updates. If set, overrides epochs. Useful for precise training budgets.</span>
+                    </label>
                     <input type="number" id="train-steps" placeholder="Auto-calculate from epochs" min="100" max="100000">
                     
-                    <label>LR Scheduler:</label>
+                    <label class="tooltip">LR Scheduler:
+                        <span class="tooltiptext">How learning rate changes during training. Warmup+Cosine is standard for transformers.</span>
+                    </label>
                     <select id="scheduler-type">
                         <option value="warmup_cosine">Warmup + Cosine</option>
                         <option value="warmup_linear">Warmup + Linear</option>
@@ -142,28 +262,38 @@
                         <option value="onecycle">One Cycle</option>
                     </select>
                     
-                    <label>Warmup Ratio: <span id="warmup-ratio-value">5</span>%</label>
+                    <label class="tooltip">Warmup Ratio: <span id="warmup-ratio-value">5</span>%
+                        <span class="tooltiptext">Percentage of training with linearly increasing LR. Helps stabilize early training. 5-10% is typical.</span>
+                    </label>
                     <input type="range" id="warmup-ratio" min="0" max="20" step="1" value="5" class="slider">
                     
-                    <label>Min LR Ratio: <span id="min-lr-ratio-value">10</span>%</label>
+                    <label class="tooltip">Min LR Ratio: <span id="min-lr-ratio-value">10</span>%
+                        <span class="tooltiptext">Final LR as percentage of initial. Lower values = more aggressive decay. 10% is a good default.</span>
+                    </label>
                     <input type="range" id="min-lr-ratio" min="0" max="50" step="5" value="10" class="slider">
                 </div>
                 
                 <h3>Optimization Settings</h3>
                 <div class="config-group">
-                    <label class="switch-label">
+                    <label class="switch-label tooltip">
                         <input type="checkbox" id="compile-model" class="toggle-switch" checked>
                         <span>Torch Compile</span>
+                        <span class="tooltiptext">JIT compilation for ~2x speedup. May increase startup time. Disable if debugging.</span>
                     </label>
-                    <label class="switch-label">
+                    <label class="switch-label tooltip">
                         <input type="checkbox" id="use-amp" class="toggle-switch" checked>
                         <span>Mixed Precision (FP16)</span>
+                        <span class="tooltiptext">Use 16-bit floats for faster training and less memory. Usually no accuracy loss.</span>
                     </label>
                     
-                    <label>Gradient Accumulation Steps:</label>
+                    <label class="tooltip">Gradient Accumulation Steps:
+                        <span class="tooltiptext">Accumulate gradients over N batches before updating. Simulates larger batch size without more memory.</span>
+                    </label>
                     <input type="number" id="gradient-accumulation-steps" value="1" min="1" max="32">
                     
-                    <label>Gradient Clip Norm:</label>
+                    <label class="tooltip">Gradient Clip Norm:
+                        <span class="tooltiptext">Maximum gradient norm. Prevents exploding gradients. 1.0 is standard for transformers.</span>
+                    </label>
                     <input type="number" id="gradient-clip-norm" value="1.0" step="0.1" min="0.1" max="10">
                 </div>
                 
@@ -173,7 +303,9 @@
             
             <!-- Loss Chart -->
             <div class="panel chart-panel" id="loss-chart-panel">
-                <h2>Training Metrics</h2>
+                <h2 class="tooltip">Training Metrics
+                    <span class="tooltiptext">Real-time visualization of loss and validation metrics. Lower loss = better predictions.</span>
+                </h2>
                 <div style="height: 300px; position: relative;">
                     <canvas id="loss-chart"></canvas>
                 </div>
@@ -181,7 +313,9 @@
             
             <!-- Learning Rate Schedule -->
             <div class="panel" id="lr-schedule-panel">
-                <h2>Learning Rate Schedule</h2>
+                <h2 class="tooltip">Learning Rate Schedule
+                    <span class="tooltiptext">Shows how learning rate changes during training. Warmup prevents instability, decay improves convergence.</span>
+                </h2>
                 <div style="height: 250px; position: relative;">
                     <canvas id="lr-schedule-chart"></canvas>
                 </div>
@@ -193,10 +327,14 @@
             
             <!-- Architecture Visualization -->
             <div class="panel chart-panel" id="architecture-panel">
-                <h2>Model Architecture</h2>
+                <h2>Model Architecture (WIP!)</h2>
                 <div class="architecture-controls">
                     <button id="reset-zoom">Reset View</button>
                     <button id="toggle-animations">Toggle Animations</button>
+                    <label class="switch-label">
+                        <input type="checkbox" id="detail-level" class="toggle-switch">
+                        <span>Detailed View</span>
+                    </label>
                     <label class="switch-label">
                         <input type="checkbox" id="visualization-mode" class="toggle-switch">
                         <span>Visualization Mode</span>
@@ -237,7 +375,9 @@
             
             <!-- Text Generation -->
             <div class="panel" id="generation-panel">
-                <h2>Text Generation</h2>
+                <h2 class="tooltip">Text Generation
+                    <span class="tooltiptext">Test your trained model by generating text. Temperature controls randomness (lower = more predictable).</span>
+                </h2>
                 <div class="input-group">
                     <label>Prompt:</label>
                     <input type="text" id="prompt-input" placeholder="Enter prompt text...">
@@ -460,11 +600,148 @@ def test_discriminative(pcn, x):
                     </div>
                 </div>
             </div>
+            
+            <!-- Multi-LoRA Tab -->
+            <div id="multi-lora-tab" class="tab-panel">
+                <div class="multi-lora-grid">
+                    <!-- Multi-LoRA Configuration -->
+                    <div class="panel" id="multi-lora-config-panel">
+                        <h2>Multi-LoRA Configuration</h2>
+                        <div class="config-section">
+                            <h3>LoRA Settings</h3>
+                            <div class="slider-group">
+                                <label>Number of LoRAs: <span id="num-loras-value">4</span></label>
+                                <input type="range" id="num-loras" min="2" max="8" value="4" class="slider">
+                                
+                                <label>LoRA Rank: <span id="lora-rank-value">8</span></label>
+                                <input type="range" id="lora-rank" min="1" max="32" value="8" class="slider">
+                                
+                                <label>LoRA Alpha: <span id="lora-alpha-value">16</span></label>
+                                <input type="range" id="lora-alpha" min="1" max="64" value="16" class="slider">
+                            </div>
+                        </div>
+                        
+                        <div class="config-section">
+                            <h3>Selection Mode</h3>
+                            <div class="radio-group">
+                                <label>
+                                    <input type="radio" name="lora-selection-mode" value="hard" checked>
+                                    Hard Selection (Min Error)
+                                </label>
+                                <label>
+                                    <input type="radio" name="lora-selection-mode" value="soft">
+                                    Soft Selection (Gated)
+                                </label>
+                                <label>
+                                    <input type="radio" name="lora-selection-mode" value="all">
+                                    All LoRAs (Analysis Only)
+                                </label>
+                            </div>
+                            
+                            <div id="soft-selection-options" style="display: none;">
+                                <label>Temperature: <span id="temperature-value">1.0</span></label>
+                                <input type="range" id="selection-temperature" min="0.1" max="5.0" step="0.1" value="1.0" class="slider">
+                            </div>
+                        </div>
+                        
+                        <div class="config-section">
+                            <h3>Target Modules</h3>
+                            <div class="checkbox-group">
+                                <label class="switch-label">
+                                    <input type="checkbox" class="toggle-switch" value="query" checked>
+                                    <span>Query Projections</span>
+                                </label>
+                                <label class="switch-label">
+                                    <input type="checkbox" class="toggle-switch" value="value" checked>
+                                    <span>Value Projections</span>
+                                </label>
+                                <label class="switch-label">
+                                    <input type="checkbox" class="toggle-switch" value="key">
+                                    <span>Key Projections</span>
+                                </label>
+                                <label class="switch-label">
+                                    <input type="checkbox" class="toggle-switch" value="output_proj">
+                                    <span>Output Projections</span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <button id="start-multi-lora-training" class="btn btn-primary">Start Multi-LoRA Training</button>
+                        <button id="stop-multi-lora-training" class="btn btn-secondary">Stop Training</button>
+                    </div>
+                    
+                    <!-- LoRA Selection Distribution -->
+                    <div class="panel chart-panel" id="lora-selection-panel">
+                        <h2>LoRA Selection Statistics</h2>
+                        <div class="metric-highlight">
+                            <p>Specialization Score: <span id="specialization-score">0.000</span></p>
+                            <small>Lower scores indicate more specialized LoRAs</small>
+                        </div>
+                        <div style="height: 300px; position: relative;">
+                            <canvas id="lora-selection-chart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- LoRA Performance Comparison -->
+                    <div class="panel chart-panel" id="lora-performance-panel">
+                        <h2>Per-LoRA Performance</h2>
+                        <div style="height: 300px; position: relative;">
+                            <canvas id="lora-performance-chart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- Token Selection Heatmap -->
+                    <div class="panel chart-panel" id="token-heatmap-panel" style="grid-column: 1 / -1;">
+                        <h2>Token-wise LoRA Selection Pattern</h2>
+                        <div class="heatmap-controls">
+                            <label>
+                                Sequence Window: 
+                                <select id="heatmap-window">
+                                    <option value="last">Last Batch</option>
+                                    <option value="avg">Running Average</option>
+                                    <option value="specific">Specific Example</option>
+                                </select>
+                            </label>
+                            <label class="switch-label">
+                                <input type="checkbox" id="show-token-text" class="toggle-switch">
+                                <span>Show Token Text</span>
+                            </label>
+                        </div>
+                        <div id="token-selection-heatmap" style="height: 250px; overflow-x: auto;"></div>
+                    </div>
+                    
+                    <!-- Multi-LoRA Analysis -->
+                    <div class="panel" id="multi-lora-analysis-panel" style="grid-column: 1 / -1;">
+                        <h2>LoRA Specialization Analysis</h2>
+                        <div class="analysis-grid">
+                            <div class="analysis-box">
+                                <h3>Token Type Preferences</h3>
+                                <div id="token-type-analysis">
+                                    <p class="placeholder">Run training to see token type analysis...</p>
+                                </div>
+                            </div>
+                            <div class="analysis-box">
+                                <h3>Position-based Selection</h3>
+                                <div id="position-analysis">
+                                    <p class="placeholder">Run training to see position-based patterns...</p>
+                                </div>
+                            </div>
+                            <div class="analysis-box">
+                                <h3>Linguistic Pattern Clustering</h3>
+                                <div id="pattern-clustering">
+                                    <p class="placeholder">Run training to see pattern clusters...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
     
-    <script src="/static/architecture.js"></script>
-    <script src="/static/main.js"></script>
-    <script src="/static/pcn_visualizations.js"></script>
+    <script src="/static/architecture.js?v=1.0.0"></script>
+    <script src="/static/main.js?v=1.0.0"></script>
+    <script src="/static/pcn_visualizations.js?v=1.0.0"></script>
+    <script src="/static/multi_lora_viz.js?v=1.0.0"></script>
 </body>
 </html>

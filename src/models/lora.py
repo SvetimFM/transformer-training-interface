@@ -34,10 +34,14 @@ class LoRALayer(nn.Module):
         self.alpha = alpha
         self.scaling = alpha / rank
         
-        # Create low-rank matrices A and B
+        # Create low-rank matrices A and B with explicit naming
         self.lora_A = nn.Parameter(torch.zeros(rank, in_features))
         self.lora_B = nn.Parameter(torch.zeros(out_features, rank))
         self.dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
+        
+        # Register parameters explicitly for easier identification
+        self.register_parameter('lora_down', self.lora_A)
+        self.register_parameter('lora_up', self.lora_B)
         
         # Initialize weights
         self.reset_parameters()

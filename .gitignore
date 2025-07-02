@@ -132,3 +132,18 @@ pip-delete-this-directory.txt
 .mypy_cache/
 .hypothesis/
 node_modules/
+
+# Archive folder
+_archive/
+
+# Experimental files patterns
+lima_*
+multi_lora_*
+self_organizing_*
+train_lima_*
+train_self_organizing*
+demo_*
+analyze_*
+compare_*
+visualize_*
+debug_*

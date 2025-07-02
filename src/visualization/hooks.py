@@ -51,9 +51,10 @@ def register_model_components(model: nn.Module, config=None):
         # Register embedding add operation (virtual component)
         embed_add_id = component_registry.register_component(
             None,
-            "Embedding Add",
+            "Token + Position",
             ComponentType.ADD,
-            parent_id=last_component_id
+            parent_id=last_component_id,
+            operation="element-wise add"
         )
         # Connect position embeddings to the add node as well
         component_registry.components[pos_emb_id].children_ids.append(embed_add_id)
@@ -157,122 +158,244 @@ def register_model_components(model: nn.Module, config=None):
     return model_id
 
 def register_transformer_block(block: nn.Module, name: str, parent_id: str, layer_idx: int) -> str:
-    """Register a transformer block and its components"""
+    """Register a transformer block and its components with proper sequential flow"""
+    
+    # Get dimensions from the block
+    n_embed = block.attention.n_embed if hasattr(block.attention, 'n_embed') else None
     
     block_id = component_registry.register_component(
         block,
         name,
         ComponentType.TRANSFORMER_BLOCK,
         parent_id=parent_id,
-        layer_idx=layer_idx
+        layer_idx=layer_idx,
+        n_embed=n_embed
     )
     
-    # Pre-norm 1
+    # Track the flow through the block
+    current_id = block_id
+    
+    # Pre-LayerNorm path for attention
     if hasattr(block, 'ln1') and block.use_layer_norm and block.norm_position == "pre":
         ln1_id = component_registry.register_component(
             block.ln1,
-            "Pre-Attention Norm",
+            "LayerNorm (pre-attention)",
             ComponentType.LAYER_NORM,
-            parent_id=block_id
+            parent_id=current_id,
+            n_embed=n_embed
         )
         activation_tracker.add_forward_hook(block.ln1, ln1_id)
+        current_id = ln1_id
     
     # Multi-head attention
     if hasattr(block, 'attention'):
         attn_id = register_multi_head_attention(
             block.attention, 
             "Multi-Head Attention", 
-            block_id,
+            current_id,
             layer_idx
         )
+        current_id = attn_id
     
-    # Post-norm 1
-    if hasattr(block, 'ln1') and block.use_layer_norm and block.norm_position == "post":
-        ln1_id = component_registry.register_component(
-            block.ln1,
-            "Post-Attention Norm",
-            ComponentType.LAYER_NORM,
-            parent_id=block_id
+    # Dropout after attention
+    if hasattr(block, 'dropout'):
+        dropout1_id = component_registry.register_component(
+            None,  # Virtual component
+            "Dropout (post-attention)",
+            ComponentType.DROPOUT,
+            parent_id=current_id,
+            p=block.dropout.p
         )
-        activation_tracker.add_forward_hook(block.ln1, ln1_id)
+        current_id = dropout1_id
     
-    # Pre-norm 2
+    # First residual add
+    if block.use_residual:
+        res1_id = component_registry.register_component(
+            None,
+            "Residual Add",
+            ComponentType.RESIDUAL_ADD,
+            parent_id=current_id
+        )
+        # Connect the block input to residual add
+        component_registry.components[block_id].children_ids.append(res1_id)
+        current_id = res1_id
+    
+    # Post-LayerNorm for attention
+    if hasattr(block, 'ln1') and block.use_layer_norm and block.norm_position == "post":
+        ln1_post_id = component_registry.register_component(
+            block.ln1,
+            "LayerNorm (post-attention)",
+            ComponentType.LAYER_NORM,
+            parent_id=current_id,
+            n_embed=n_embed
+        )
+        activation_tracker.add_forward_hook(block.ln1, ln1_post_id)
+        current_id = ln1_post_id
+    
+    # Pre-LayerNorm for FFN
     if hasattr(block, 'ln2') and block.use_layer_norm and block.norm_position == "pre":
         ln2_id = component_registry.register_component(
             block.ln2,
-            "Pre-FFN Norm",
+            "LayerNorm (pre-FFN)",
             ComponentType.LAYER_NORM,
-            parent_id=block_id
+            parent_id=current_id,
+            n_embed=n_embed
         )
         activation_tracker.add_forward_hook(block.ln2, ln2_id)
+        current_id = ln2_id
     
     # Feed-forward network
     if hasattr(block, 'feed_forward'):
         ffn_id = register_feed_forward(
             block.feed_forward,
-            "Feed Forward",
-            block_id
+            "Feed Forward Network",
+            current_id
         )
+        current_id = ffn_id
     
-    # Post-norm 2
-    if hasattr(block, 'ln2') and block.use_layer_norm and block.norm_position == "post":
-        ln2_id = component_registry.register_component(
-            block.ln2,
-            "Post-FFN Norm",
-            ComponentType.LAYER_NORM,
-            parent_id=block_id
+    # Dropout after FFN
+    if hasattr(block, 'dropout'):
+        dropout2_id = component_registry.register_component(
+            None,  # Virtual component
+            "Dropout (post-FFN)",
+            ComponentType.DROPOUT,
+            parent_id=current_id,
+            p=block.dropout.p
         )
-        activation_tracker.add_forward_hook(block.ln2, ln2_id)
+        current_id = dropout2_id
     
-    # Residual connections (virtual components)
+    # Second residual add
     if block.use_residual:
-        res1_id = component_registry.register_component(
-            None,
-            "Residual Connection 1",
-            ComponentType.ADD,
-            parent_id=block_id
-        )
-        
         res2_id = component_registry.register_component(
             None,
-            "Residual Connection 2",
-            ComponentType.ADD,
-            parent_id=block_id
+            "Residual Add",
+            ComponentType.RESIDUAL_ADD,
+            parent_id=current_id
         )
+        # Connect the first residual output to second residual add
+        if 'res1_id' in locals():
+            component_registry.components[res1_id].children_ids.append(res2_id)
+        current_id = res2_id
+    
+    # Post-LayerNorm for FFN
+    if hasattr(block, 'ln2') and block.use_layer_norm and block.norm_position == "post":
+        ln2_post_id = component_registry.register_component(
+            block.ln2,
+            "LayerNorm (post-FFN)",
+            ComponentType.LAYER_NORM,
+            parent_id=current_id,
+            n_embed=n_embed
+        )
+        activation_tracker.add_forward_hook(block.ln2, ln2_post_id)
+        current_id = ln2_post_id
+    
+    # Set the block's output to be the last component
+    component_registry.components[block_id].params['output_id'] = current_id
     
     return block_id
 
 def register_multi_head_attention(mha: nn.Module, name: str, parent_id: str, layer_idx: int = 0) -> str:
-    """Register multi-head attention and its heads"""
+    """Register multi-head attention and its internal components"""
+    
+    n_embed = mha.n_embed if hasattr(mha, 'n_embed') else None
+    num_heads = len(mha.heads) if hasattr(mha, 'heads') else 0
     
     mha_id = component_registry.register_component(
         mha,
         name,
         ComponentType.ATTENTION,
         parent_id=parent_id,
-        num_heads=len(mha.heads) if hasattr(mha, 'heads') else 0
+        num_heads=num_heads,
+        n_embed=n_embed
+    )
+    
+    # Split operation for Q, K, V
+    split_id = component_registry.register_component(
+        None,
+        "Split to Heads",
+        ComponentType.SPLIT,
+        parent_id=mha_id
+    )
+    
+    # Container for all heads
+    heads_container_id = component_registry.register_component(
+        None,
+        "Attention Heads",
+        ComponentType.ATTENTION,
+        parent_id=split_id
     )
     
     # Register individual attention heads
     if hasattr(mha, 'heads'):
         for i, head in enumerate(mha.heads):
+            head_size = head.head_size if hasattr(head, 'head_size') else n_embed // num_heads
             head_id = component_registry.register_component(
                 head,
                 f"Head {i+1}",
                 ComponentType.ATTENTION_HEAD,
-                parent_id=mha_id,
-                head_size=head.head_size if hasattr(head, 'head_size') else 0
+                parent_id=heads_container_id,
+                head_size=head_size,
+                head_idx=i
             )
             activation_tracker.add_forward_hook(head, head_id)
             activation_tracker.add_backward_hook(head, head_id)
             
+            # Register Q, K, V projections for each head
+            if hasattr(head, 'query'):
+                q_id = component_registry.register_component(
+                    head.query,
+                    f"Query {i+1}",
+                    ComponentType.LINEAR,
+                    parent_id=head_id,
+                    in_features=n_embed,
+                    out_features=head_size
+                )
+                k_id = component_registry.register_component(
+                    head.key,
+                    f"Key {i+1}",
+                    ComponentType.LINEAR,
+                    parent_id=head_id,
+                    in_features=n_embed,
+                    out_features=head_size
+                )
+                v_id = component_registry.register_component(
+                    head.value,
+                    f"Value {i+1}",
+                    ComponentType.LINEAR,
+                    parent_id=head_id,
+                    in_features=n_embed,
+                    out_features=head_size
+                )
+            
             # Register for attention capture
             attention_capture.register_attention_head(head, head_id, i, layer_idx)
     
-    return mha_id
+    # Concatenate heads
+    concat_id = component_registry.register_component(
+        None,
+        "Concat Heads",
+        ComponentType.CONCAT,
+        parent_id=heads_container_id
+    )
+    
+    # Output projection
+    if hasattr(mha, 'output_proj') or hasattr(mha, 'proj'):
+        output_proj = getattr(mha, 'output_proj', getattr(mha, 'proj', None))
+        if output_proj:
+            proj_id = component_registry.register_component(
+                output_proj,
+                "Output Projection",
+                ComponentType.LINEAR,
+                parent_id=concat_id,
+                in_features=n_embed,
+                out_features=n_embed
+            )
+            return proj_id
+    
+    return concat_id
 
 def register_feed_forward(ffn: nn.Module, name: str, parent_id: str) -> str:
-    """Register feed-forward network components"""
+    """Register feed-forward network components with internal structure"""
     
     ffn_id = component_registry.register_component(
         ffn,
@@ -281,6 +404,54 @@ def register_feed_forward(ffn: nn.Module, name: str, parent_id: str) -> str:
         parent_id=parent_id
     )
     
+    current_id = ffn_id
+    
+    # Check if FFN has internal layers
+    if hasattr(ffn, 'fc1') and hasattr(ffn, 'fc2'):
+        # First linear layer
+        fc1_id = component_registry.register_component(
+            ffn.fc1,
+            "FFN Linear 1",
+            ComponentType.LINEAR,
+            parent_id=current_id,
+            in_features=ffn.fc1.in_features,
+            out_features=ffn.fc1.out_features
+        )
+        current_id = fc1_id
+        
+        # Activation function
+        if hasattr(ffn, 'activation'):
+            act_id = component_registry.register_component(
+                ffn.activation,
+                f"FFN {ffn.activation.__class__.__name__}",
+                ComponentType.ACTIVATION,
+                parent_id=current_id
+            )
+            current_id = act_id
+        
+        # Dropout if present
+        if hasattr(ffn, 'dropout'):
+            dropout_id = component_registry.register_component(
+                ffn.dropout,
+                "FFN Dropout",
+                ComponentType.DROPOUT,
+                parent_id=current_id,
+                p=ffn.dropout.p
+            )
+            current_id = dropout_id
+        
+        # Second linear layer
+        fc2_id = component_registry.register_component(
+            ffn.fc2,
+            "FFN Linear 2",
+            ComponentType.LINEAR,
+            parent_id=current_id,
+            in_features=ffn.fc2.in_features,
+            out_features=ffn.fc2.out_features
+        )
+        current_id = fc2_id
+    
+    # Track activation hooks
     activation_tracker.add_forward_hook(ffn, ffn_id)
     activation_tracker.add_backward_hook(ffn, ffn_id)
     

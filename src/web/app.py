@@ -291,6 +291,16 @@ async def control_training(control: TrainingControl):
         success = trainer.stop_training()
         activation_tracker.stop_tracking()
         if success:
+            # Broadcast status update to all clients
+            status_update = {
+                "type": "status",
+                "data": trainer.get_status()
+            }
+            for client in websocket_clients:
+                try:
+                    await client.send_json(status_update)
+                except:
+                    pass
             return {"status": "training_stopped"}
         else:
             return {"status": "not_training"}

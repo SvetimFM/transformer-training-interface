@@ -4,17 +4,28 @@ import torch.nn as nn
 from enum import Enum
 
 class ComponentType(Enum):
+    # Layers and weights (rectangles)
     EMBEDDING = "embedding"
     LINEAR = "linear"
+    LAYER_NORM = "layer_norm"
+    FEED_FORWARD = "feed_forward"
+    
+    # Operations (diamonds)
+    MATMUL = "matmul"
+    ADD = "add"
+    RESIDUAL_ADD = "residual_add"
+    CONCAT = "concat"
+    SPLIT = "split"
+    SOFTMAX = "softmax"
+    
+    # Activations (circles)
+    ACTIVATION = "activation"
+    DROPOUT = "dropout"
+    
+    # Complex components (special shapes)
     ATTENTION = "attention"
     ATTENTION_HEAD = "attention_head"
-    LAYER_NORM = "layer_norm"
-    DROPOUT = "dropout"
-    ACTIVATION = "activation"
-    ADD = "add"
-    SOFTMAX = "softmax"
     TRANSFORMER_BLOCK = "transformer_block"
-    FEED_FORWARD = "feed_forward"
 
 class ComponentState(Enum):
     INACTIVE = "inactive"
@@ -34,6 +45,9 @@ class ComponentInfo:
     params: Dict[str, Any] = field(default_factory=dict)
     position: Dict[str, int] = field(default_factory=dict)  # layer, index within layer
     state: ComponentState = ComponentState.INACTIVE
+    # Dimension information
+    input_dim: Optional[List[int]] = None  # Input tensor dimensions
+    output_dim: Optional[List[int]] = None  # Output tensor dimensions
     
     def to_dict(self):
         return {
@@ -44,7 +58,9 @@ class ComponentInfo:
             "children_ids": self.children_ids,
             "params": self.params,
             "position": self.position,
-            "state": self.state.value
+            "state": self.state.value,
+            "input_dim": self.input_dim,
+            "output_dim": self.output_dim
         }
 
 class ComponentRegistry:

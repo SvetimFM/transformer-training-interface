@@ -3,6 +3,7 @@ class ArchitectureVisualizer {
         this.container = document.getElementById(containerId);
         this.svg = null;
         this.components = {};
+        this.detailLevel = 'low'; // 'low' or 'high'
         this.layout = {
             width: 800,
             height: 600,
@@ -87,9 +88,11 @@ class ArchitectureVisualizer {
         // Draw connections first (so they appear behind nodes)
         this.drawConnections(components, positions);
         
-        // Draw components
+        // Draw components (filter based on detail level)
         Object.entries(components).forEach(([id, component]) => {
-            this.drawComponent(id, component, positions[id]);
+            if (this.shouldShowComponent(component)) {
+                this.drawComponent(id, component, positions[id]);
+            }
         });
     }
     
@@ -100,29 +103,98 @@ class ArchitectureVisualizer {
         // Group components by layer
         const layers = this.groupByLayers(components, rootIds);
         
+        // Track transformer block boundaries
+        const transformerBlocks = {};
+        
         layers.forEach((layer, layerIndex) => {
-            const layerWidth = layer.length * this.layout.horizontalSpacing;
-            const startX = (this.layout.width - layerWidth) / 2;
+            let maxHeight = 0;
+            const layerComponents = [];
             
-            layer.forEach((componentId, index) => {
+            // First pass: determine sizes and filter visible components
+            layer.forEach(componentId => {
                 const component = components[componentId];
+                
+                // Skip components that shouldn't be shown
+                if (!this.shouldShowComponent(component)) {
+                    return;
+                }
+                
                 let width = this.layout.nodeWidth;
                 let height = this.layout.nodeHeight;
                 
                 // Adjust size based on component type
                 if (component.type === 'attention_head') {
                     width = height = this.layout.headSize;
+                } else if (['matmul', 'add', 'residual_add', 'concat', 'split', 'softmax'].includes(component.type)) {
+                    width = height = 50; // Diamonds are smaller
+                } else if (['activation', 'dropout'].includes(component.type)) {
+                    width = height = 40; // Circles are smaller
+                } else if (component.type === 'transformer_block') {
+                    // Skip transformer blocks in positioning, but track them
+                    transformerBlocks[componentId] = {
+                        startY: currentY,
+                        components: []
+                    };
+                    return;
                 }
                 
-                positions[componentId] = {
-                    x: startX + index * this.layout.horizontalSpacing,
-                    y: currentY,
+                layerComponents.push({
+                    id: componentId,
+                    component: component,
                     width: width,
                     height: height
-                };
+                });
+                
+                maxHeight = Math.max(maxHeight, height);
             });
             
-            currentY += this.layout.verticalSpacing;
+            // Second pass: position components
+            const layerWidth = layerComponents.length * this.layout.horizontalSpacing;
+            const startX = (this.layout.width - layerWidth) / 2;
+            
+            layerComponents.forEach((item, index) => {
+                positions[item.id] = {
+                    x: startX + index * this.layout.horizontalSpacing,
+                    y: currentY,
+                    width: item.width,
+                    height: item.height
+                };
+                
+                // Track which transformer block this component belongs to
+                let parentBlock = this.findParentTransformerBlock(item.component, components);
+                if (parentBlock && transformerBlocks[parentBlock]) {
+                    transformerBlocks[parentBlock].components.push(item.id);
+                }
+            });
+            
+            if (layerComponents.length > 0) {
+                currentY += maxHeight + this.layout.verticalSpacing;
+            }
+        });
+        
+        // Position transformer blocks around their children
+        Object.entries(transformerBlocks).forEach(([blockId, blockInfo]) => {
+            if (blockInfo.components.length > 0) {
+                let minX = Infinity, maxX = -Infinity;
+                let minY = Infinity, maxY = -Infinity;
+                
+                blockInfo.components.forEach(compId => {
+                    const pos = positions[compId];
+                    if (pos) {
+                        minX = Math.min(minX, pos.x);
+                        maxX = Math.max(maxX, pos.x + pos.width);
+                        minY = Math.min(minY, pos.y);
+                        maxY = Math.max(maxY, pos.y + pos.height);
+                    }
+                });
+                
+                positions[blockId] = {
+                    x: minX - 30,
+                    y: minY - 30,
+                    width: maxX - minX + 60,
+                    height: maxY - minY + 60
+                };
+            }
         });
         
         // Update SVG height if needed
@@ -133,6 +205,18 @@ class ArchitectureVisualizer {
         }
         
         return positions;
+    }
+    
+    findParentTransformerBlock(component, components) {
+        let current = component;
+        while (current && current.parent_id) {
+            const parent = components[current.parent_id];
+            if (parent && parent.type === 'transformer_block') {
+                return current.parent_id;
+            }
+            current = parent;
+        }
+        return null;
     }
     
     groupByLayers(components, rootIds) {
@@ -168,22 +252,82 @@ class ArchitectureVisualizer {
         const connectionsGroup = this.mainGroup.append('g')
             .attr('class', 'connections');
         
+        // Helper function to find the next visible descendant
+        const findNextVisibleDescendant = (componentId, visited = new Set()) => {
+            if (visited.has(componentId)) return [];
+            visited.add(componentId);
+            
+            const component = components[componentId];
+            if (!component || !component.children_ids) return [];
+            
+            const visibleChildren = [];
+            
+            for (const childId of component.children_ids) {
+                const child = components[childId];
+                if (child && this.shouldShowComponent(child)) {
+                    visibleChildren.push(childId);
+                } else if (child) {
+                    // Recursively find visible descendants
+                    visibleChildren.push(...findNextVisibleDescendant(childId, visited));
+                }
+            }
+            
+            return visibleChildren;
+        };
+        
         Object.entries(components).forEach(([id, component]) => {
+            // Skip if component is not shown
+            if (!this.shouldShowComponent(component)) {
+                return;
+            }
+            
             if (component.children_ids) {
-                component.children_ids.forEach(childId => {
+                // Find all visible descendants (direct children or through hidden components)
+                const visibleDescendants = findNextVisibleDescendant(id);
+                
+                visibleDescendants.forEach(descendantId => {
                     const startPos = positions[id];
-                    const endPos = positions[childId];
+                    const endPos = positions[descendantId];
                     
                     if (startPos && endPos) {
-                        const path = connectionsGroup.append('path')
+                        const connectionGroup = connectionsGroup.append('g')
+                            .attr('class', 'connection-group');
+                        
+                        // Draw the connection path
+                        const path = connectionGroup.append('path')
                             .attr('class', 'connection')
                             .attr('d', this.createPath(startPos, endPos))
                             .attr('fill', 'none')
                             .attr('stroke', '#444')
                             .attr('stroke-width', 2);
                         
+                        // Add dimension label if in detailed view
+                        const descendant = components[descendantId];
+                        if (this.detailLevel === 'high' && component.output_dim && descendant.input_dim) {
+                            const midX = (startPos.x + startPos.width/2 + endPos.x + endPos.width/2) / 2;
+                            const midY = (startPos.y + startPos.height + endPos.y) / 2;
+                            
+                            // Create dimension label
+                            let dimText = '';
+                            if (component.output_dim && component.output_dim.length > 0) {
+                                dimText = component.output_dim.join('×');
+                            }
+                            
+                            if (dimText) {
+                                connectionGroup.append('text')
+                                    .attr('x', midX)
+                                    .attr('y', midY)
+                                    .attr('text-anchor', 'middle')
+                                    .attr('class', 'dimension-label connection-dim')
+                                    .attr('fill', '#666')
+                                    .attr('font-size', '10px')
+                                    .attr('dy', '-3')
+                                    .text(dimText);
+                            }
+                        }
+                        
                         // Store reference for animations
-                        path.attr('data-from', id).attr('data-to', childId);
+                        path.attr('data-from', id).attr('data-to', descendantId);
                     }
                 });
             }
@@ -212,77 +356,140 @@ class ArchitectureVisualizer {
         
         let shape;
         
-        // Draw shape based on component type
-        switch (component.type) {
-            case 'attention_head':
-                shape = group.append('circle')
-                    .attr('cx', position.width / 2)
-                    .attr('cy', position.height / 2)
-                    .attr('r', position.width / 2);
-                break;
+        // Special handling for transformer blocks - create a container
+        if (component.type === 'transformer_block') {
+            // Draw rounded rectangle container for transformer block
+            shape = group.append('rect')
+                .attr('width', position.width + 40)  // Extra width for padding
+                .attr('height', position.height + 40)  // Extra height for padding
+                .attr('x', -20)  // Offset for padding
+                .attr('y', -20)  // Offset for padding
+                .attr('rx', 15)
+                .attr('ry', 15)
+                .attr('fill', 'rgba(60, 60, 80, 0.15)')
+                .attr('stroke', '#8b5cf6')
+                .attr('stroke-width', 2)
+                .attr('stroke-dasharray', '5,5');
+        }
+        // Draw shapes based on component category
+        else if (['matmul', 'add', 'residual_add', 'concat', 'split', 'softmax'].includes(component.type)) {
+            // Operations are diamonds
+            const cx = position.width / 2;
+            const cy = position.height / 2;
+            const size = Math.min(position.width, position.height) * 0.8;
+            
+            shape = group.append('path')
+                .attr('d', `M ${cx} ${cy - size/2} L ${cx + size/2} ${cy} L ${cx} ${cy + size/2} L ${cx - size/2} ${cy} Z`);
                 
-            case 'layer_norm':
-            case 'dropout':
-                shape = group.append('ellipse')
-                    .attr('cx', position.width / 2)
-                    .attr('cy', position.height / 2)
-                    .attr('rx', position.width / 2)
-                    .attr('ry', position.height / 2);
-                break;
-                
-            case 'add':
-                shape = group.append('circle')
-                    .attr('cx', position.width / 2)
-                    .attr('cy', position.height / 2)
-                    .attr('r', 15);
+            // Add operation symbol
+            const symbols = {
+                'add': '+',
+                'residual_add': '⊕',
+                'matmul': '×',
+                'concat': '⊔',
+                'split': '⊓',
+                'softmax': 'σ'
+            };
+            
+            if (symbols[component.type]) {
                 group.append('text')
-                    .attr('x', position.width / 2)
-                    .attr('y', position.height / 2)
+                    .attr('x', cx)
+                    .attr('y', cy)
                     .attr('text-anchor', 'middle')
                     .attr('dominant-baseline', 'middle')
                     .attr('fill', 'white')
-                    .attr('font-size', '18px')
-                    .text('+');
-                break;
-                
-            default:
-                shape = group.append('rect')
-                    .attr('width', position.width)
-                    .attr('height', position.height)
-                    .attr('rx', 5)
-                    .attr('ry', 5);
+                    .attr('font-size', '16px')
+                    .attr('font-weight', 'bold')
+                    .text(symbols[component.type]);
+            }
+        }
+        else if (['activation', 'dropout'].includes(component.type)) {
+            // Activations are circles
+            shape = group.append('circle')
+                .attr('cx', position.width / 2)
+                .attr('cy', position.height / 2)
+                .attr('r', Math.min(position.width, position.height) / 2.5);
+        }
+        else {
+            // Layers/weights are rectangles
+            shape = group.append('rect')
+                .attr('width', position.width)
+                .attr('height', position.height)
+                .attr('rx', 5)
+                .attr('ry', 5);
         }
         
-        shape.attr('class', 'component-shape')
-            .attr('fill', this.getComponentColor(component.type))
-            .attr('stroke', '#333')
-            .attr('stroke-width', 2);
+        if (shape && component.type !== 'transformer_block') {
+            shape.attr('class', 'component-shape')
+                .attr('fill', this.getComponentColor(component.type))
+                .attr('stroke', '#333')
+                .attr('stroke-width', 2);
+        }
         
-        // Add label (except for add nodes)
-        if (component.type !== 'add') {
+        // Add label
+        if (!['add', 'residual_add', 'matmul', 'concat', 'split', 'softmax'].includes(component.type)) {
             const text = group.append('text')
                 .attr('x', position.width / 2)
                 .attr('y', position.height / 2)
                 .attr('text-anchor', 'middle')
                 .attr('dominant-baseline', 'middle')
                 .attr('class', 'component-label')
-                .attr('fill', 'white')
-                .attr('font-size', '12px');
+                .attr('fill', component.type === 'transformer_block' ? '#888' : 'white')
+                .attr('font-size', component.type === 'transformer_block' ? '14px' : '12px')
+                .attr('font-weight', component.type === 'transformer_block' ? 'bold' : 'normal');
             
-            // Split long names
-            const words = component.name.split(' ');
-            if (words.length > 2 && component.type !== 'attention_head') {
-                text.append('tspan')
-                    .attr('x', position.width / 2)
-                    .attr('dy', '-0.3em')
-                    .text(words.slice(0, -1).join(' '));
-                text.append('tspan')
-                    .attr('x', position.width / 2)
-                    .attr('dy', '1.2em')
-                    .text(words[words.length - 1]);
+            // Handle text for different component types
+            if (component.type === 'attention_head') {
+                text.text(`H${component.params.head_idx + 1}`);
+            } else if (component.type === 'dropout') {
+                text.text(`Drop ${component.params.p || 0.1}`);
             } else {
-                text.text(component.type === 'attention_head' ? `H${component.name.split(' ')[1]}` : component.name);
+                // Split long names
+                const words = component.name.split(' ');
+                if (words.length > 2 && component.type !== 'transformer_block') {
+                    text.append('tspan')
+                        .attr('x', position.width / 2)
+                        .attr('dy', '-0.3em')
+                        .text(words.slice(0, -1).join(' '));
+                    text.append('tspan')
+                        .attr('x', position.width / 2)
+                        .attr('dy', '1.2em')
+                        .text(words[words.length - 1]);
+                } else {
+                    text.text(component.name);
+                }
             }
+        }
+        
+        // Add dimension labels for linear layers and embeddings
+        if (['linear', 'embedding'].includes(component.type) && component.params) {
+            const dimText = group.append('text')
+                .attr('x', position.width / 2)
+                .attr('y', position.height + 15)
+                .attr('text-anchor', 'middle')
+                .attr('class', 'dimension-label')
+                .attr('fill', '#888')
+                .attr('font-size', '10px');
+                
+            if (component.params.in_features && component.params.out_features) {
+                dimText.text(`${component.params.in_features} → ${component.params.out_features}`);
+            } else if (component.params.vocab_size && component.params.n_embed) {
+                dimText.text(`${component.params.vocab_size} → ${component.params.n_embed}`);
+            } else if (component.params.block_size && component.params.n_embed) {
+                dimText.text(`${component.params.block_size} → ${component.params.n_embed}`);
+            }
+        }
+        
+        // Add parameter info for other components
+        if (component.type === 'layer_norm' && component.params.n_embed) {
+            group.append('text')
+                .attr('x', position.width / 2)
+                .attr('y', position.height + 15)
+                .attr('text-anchor', 'middle')
+                .attr('class', 'dimension-label')
+                .attr('fill', '#888')
+                .attr('font-size', '10px')
+                .text(`[${component.params.n_embed}]`);
         }
         
         // Add hover effect
@@ -296,16 +503,28 @@ class ArchitectureVisualizer {
     
     getComponentColor(type) {
         const colors = {
-            embedding: '#9333ea',
-            linear: '#3b82f6',
-            attention: '#10b981',
-            attention_head: '#34d399',
-            layer_norm: '#f59e0b',
-            dropout: '#ef4444',
-            activation: '#ec4899',
-            add: '#6b7280',
-            transformer_block: '#1f2937',
-            feed_forward: '#6366f1'
+            // Layers and weights (blue/purple tones) - rectangles
+            embedding: '#8b5cf6',  // Purple
+            linear: '#3b82f6',     // Blue
+            layer_norm: '#f59e0b', // Orange
+            feed_forward: '#6366f1', // Indigo
+            
+            // Operations (green/cyan tones) - diamonds
+            matmul: '#10b981',      // Emerald
+            add: '#14b8a6',         // Teal
+            residual_add: '#06b6d4', // Cyan
+            concat: '#0891b2',      // Cyan dark
+            split: '#0284c7',       // Sky
+            softmax: '#059669',     // Green
+            
+            // Activations (red/pink tones) - circles
+            activation: '#ec4899',  // Pink
+            dropout: '#ef4444',     // Red
+            
+            // Complex components
+            attention: '#10b981',   // Emerald
+            attention_head: '#34d399', // Green light
+            transformer_block: 'transparent', // No fill, just border
         };
         return colors[type] || '#6b7280';
     }
@@ -504,6 +723,69 @@ class ArchitectureVisualizer {
             // Add strong highlight to active component
             d3.select(`#component-${activeComponent}`).classed('viz-active', true);
         }
+    }
+    
+    setDetailLevel(level) {
+        this.detailLevel = level;
+        
+        // Adjust layout spacing based on detail level
+        if (level === 'low') {
+            this.layout.verticalSpacing = 100;
+            this.layout.horizontalSpacing = 180;
+        } else {
+            this.layout.verticalSpacing = 80;
+            this.layout.horizontalSpacing = 150;
+        }
+        
+        // Re-render the architecture with new detail level
+        if (Object.keys(this.components).length > 0) {
+            const architectureData = {
+                components: this.components,
+                root_components: Object.keys(this.components).filter(id => 
+                    this.components[id].parent_id === null
+                )
+            };
+            this.updateArchitecture(architectureData);
+        }
+    }
+    
+    shouldShowComponent(component) {
+        if (this.detailLevel === 'high') {
+            // Show all components in high detail mode
+            return true;
+        }
+        
+        // In low detail mode, hide certain internal components
+        const hiddenTypes = [
+            'dropout',
+            'residual_add',
+            'add',
+            'split',
+            'concat',
+            'attention_head',
+            'layer_norm'
+        ];
+        
+        // Always show transformer blocks
+        if (component.type === 'transformer_block') {
+            return true;
+        }
+        
+        // Always show major components
+        const majorTypes = [
+            'embedding',
+            'linear',
+            'attention',
+            'feed_forward',
+            'activation'
+        ];
+        
+        if (majorTypes.includes(component.type)) {
+            return true;
+        }
+        
+        // Hide internal details in low detail mode
+        return !hiddenTypes.includes(component.type);
     }
 }
 

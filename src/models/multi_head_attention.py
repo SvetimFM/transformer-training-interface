@@ -1,4 +1,4 @@
-from models.self_attention import SelfAttentionHead
+from .self_attention import SelfAttentionHead
 import torch
 import torch.nn as nn
 from torch.nn import functional as F

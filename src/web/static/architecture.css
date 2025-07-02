@@ -24,7 +24,7 @@
 
 /* Component type specific styles */
 .component-embedding .component-shape {
-    filter: drop-shadow(0 2px 4px rgba(147, 51, 234, 0.5));
+    filter: drop-shadow(0 2px 4px rgba(139, 92, 246, 0.5));
 }
 
 .component-attention .component-shape {
@@ -33,6 +33,52 @@
 
 .component-linear .component-shape {
     filter: drop-shadow(0 2px 4px rgba(59, 130, 246, 0.5));
+}
+
+.component-layer_norm .component-shape {
+    filter: drop-shadow(0 2px 4px rgba(245, 158, 11, 0.5));
+}
+
+.component-feed_forward .component-shape {
+    filter: drop-shadow(0 2px 4px rgba(99, 102, 241, 0.5));
+}
+
+/* Operation components (diamonds) */
+.component-matmul .component-shape,
+.component-add .component-shape,
+.component-residual_add .component-shape,
+.component-concat .component-shape,
+.component-split .component-shape,
+.component-softmax .component-shape {
+    stroke-width: 2.5;
+}
+
+/* Activation components (circles) */
+.component-activation .component-shape,
+.component-dropout .component-shape {
+    stroke-width: 2.5;
+}
+
+/* Transformer block container */
+.component-transformer_block .component-shape {
+    fill: rgba(139, 92, 246, 0.1);
+    stroke: #8b5cf6;
+    stroke-width: 2;
+    stroke-dasharray: 5, 5;
+}
+
+/* Dimension labels */
+.dimension-label {
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    fill: #888;
+    pointer-events: none;
+}
+
+.dimension-label.connection-dim {
+    background-color: rgba(26, 26, 26, 0.8);
+    padding: 2px 4px;
+    border-radius: 2px;
 }
 
 /* State styles */

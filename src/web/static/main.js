@@ -9,6 +9,26 @@ let animationsEnabled = true;
 function initTabSwitching() {
     const tabButtons = document.querySelectorAll('.tab-button');
     const tabPanels = document.querySelectorAll('.tab-panel');
+    const dropdownButton = document.querySelector('.dropdown-button');
+    const dropdownContent = document.querySelector('.dropdown-content');
+    
+    // Handle dropdown toggle
+    if (dropdownButton) {
+        dropdownButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            dropdownContent.classList.toggle('show');
+        });
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', () => {
+            dropdownContent.classList.remove('show');
+        });
+        
+        // Prevent dropdown from closing when clicking inside
+        dropdownContent.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+    }
     
     tabButtons.forEach(button => {
         button.addEventListener('click', () => {
@@ -18,8 +38,17 @@ function initTabSwitching() {
             tabButtons.forEach(btn => btn.classList.remove('active'));
             tabPanels.forEach(panel => panel.classList.remove('active'));
             
-            button.classList.add('active');
+            // Only mark main transformer tab as active in the main nav
+            if (targetTab === 'transformer') {
+                button.classList.add('active');
+            }
+            
             document.getElementById(`${targetTab}-tab`).classList.add('active');
+            
+            // Close dropdown after selection
+            if (dropdownContent) {
+                dropdownContent.classList.remove('show');
+            }
             
             // Initialize tab-specific content if needed
             if (targetTab === 'pcn-experiments') {
@@ -153,9 +182,10 @@ function calculateTotalParams() {
             // Attention parameters (Q, K, V, O projections)
             totalParams += 4 * embedDim * embedDim;
             
-            // FFN parameters
-            totalParams += embedDim * (hiddenMult * embedDim); // First linear
-            totalParams += (hiddenMult * embedDim) * embedDim; // Second linear
+            // FFN parameters (Note: backend currently hardcoded to 4x)
+            // TODO: Update backend FeedForward to accept hiddenMult parameter
+            totalParams += embedDim * (4 * embedDim); // First linear (using 4x as per backend)
+            totalParams += (4 * embedDim) * embedDim; // Second linear
             
             // Layer norm parameters (2 per layer)
             totalParams += 2 * embedDim;
@@ -166,9 +196,9 @@ function calculateTotalParams() {
                 // Attention parameters
                 totalParams += 4 * embedDim * embedDim;
                 
-                // FFN parameters
-                totalParams += embedDim * (hiddenMult * embedDim);
-                totalParams += (hiddenMult * embedDim) * embedDim;
+                // FFN parameters (Note: backend currently hardcoded to 4x)
+                totalParams += embedDim * (4 * embedDim);
+                totalParams += (4 * embedDim) * embedDim;
                 
                 // Layer norm parameters
                 totalParams += 2 * embedDim;
@@ -322,6 +352,8 @@ function initWebSocket() {
                 updatePCNExploration(data.data);
             } else if (data.type === 'hybrid_metrics') {
                 updateHybridMetrics(data.data);
+            } else if (data.type === 'multi_lora_metrics') {
+                updateMultiLoRAMetrics(data.data);
             }
         } catch (error) {
             console.error('Error parsing WebSocket message:', error);
@@ -477,6 +509,19 @@ function updateStatus(status) {
     document.getElementById('training-status').textContent = statusText;
     document.getElementById('current-step').textContent = status.current_step;
     document.getElementById('total-steps').textContent = status.total_steps;
+    
+    // Update button visibility based on training status
+    const startButton = document.getElementById('start-training');
+    const stopButton = document.getElementById('stop-training');
+    if (startButton && stopButton) {
+        if (status.is_training) {
+            startButton.style.display = 'none';
+            stopButton.style.display = 'inline-block';
+        } else {
+            startButton.style.display = 'inline-block';
+            stopButton.style.display = 'none';
+        }
+    }
     
     // Update epoch info if available
     if ('current_epoch' in status && 'total_epochs' in status) {
@@ -924,6 +969,13 @@ document.addEventListener('DOMContentLoaded', () => {
         initPCNCharts();
     }
     
+    // Initialize Multi-LoRA charts
+    if (typeof initMultiLoRACharts === 'function') {
+        initMultiLoRACharts();
+        initMultiLoRAConfig();
+        createTokenHeatmap('token-selection-heatmap');
+    }
+    
     // Load metrics history
     loadMetricsHistory();
     
@@ -963,6 +1015,9 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const result = await response.json();
             console.log('Training:', result.status);
+            
+            // Force a status update after stopping
+            setTimeout(getTrainingStatus, 500);
         } catch (error) {
             console.error('Failed to stop training:', error);
         }
@@ -1244,6 +1299,51 @@ document.addEventListener('DOMContentLoaded', () => {
         animationsEnabled = !animationsEnabled;
         e.target.textContent = animationsEnabled ? 'Disable Animations' : 'Enable Animations';
         e.target.classList.toggle('active', animationsEnabled);
+    });
+    
+    // Detail level toggle
+    document.getElementById('detail-level').addEventListener('change', (e) => {
+        if (architectureViz) {
+            const detailLevel = e.target.checked ? 'high' : 'low';
+            architectureViz.setDetailLevel(detailLevel);
+        }
+    });
+    
+    // Multi-LoRA training controls
+    document.getElementById('start-multi-lora-training')?.addEventListener('click', async () => {
+        const config = {
+            num_loras: parseInt(document.getElementById('num-loras').value),
+            rank: parseInt(document.getElementById('lora-rank').value),
+            alpha: parseInt(document.getElementById('lora-alpha').value),
+            selection_mode: document.querySelector('input[name="lora-selection-mode"]:checked').value,
+            temperature: parseFloat(document.getElementById('selection-temperature').value),
+            target_modules: Array.from(document.querySelectorAll('#multi-lora-config-panel .checkbox-group input:checked'))
+                .map(cb => cb.value)
+        };
+        
+        try {
+            const response = await fetch('/api/multi-lora/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config)
+            });
+            const result = await response.json();
+            console.log('Multi-LoRA training started:', result);
+        } catch (error) {
+            console.error('Failed to start Multi-LoRA training:', error);
+        }
+    });
+    
+    document.getElementById('stop-multi-lora-training')?.addEventListener('click', async () => {
+        try {
+            const response = await fetch('/api/multi-lora/stop', {
+                method: 'POST'
+            });
+            const result = await response.json();
+            console.log('Multi-LoRA training stopped:', result);
+        } catch (error) {
+            console.error('Failed to stop Multi-LoRA training:', error);
+        }
     });
     
     // Visualization mode controls
