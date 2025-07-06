@@ -29,9 +29,9 @@ We use GitHub to host code, to track issues and feature requests, as well as acc
 
 In short, when you submit code changes, your submissions are understood to be under the same [MIT License](LICENSE) that covers the project.
 
-## Report bugs using GitHub's [issues](https://github.com/yourusername/transformer-pcn-ui/issues)
+## Report bugs using GitHub's [issues](https://github.com/SvetimFM/transformer-pcn-ui/issues)
 
-We use GitHub issues to track public bugs. Report a bug by [opening a new issue](https://github.com/yourusername/transformer-pcn-ui/issues/new).
+We use GitHub issues to track public bugs. Report a bug by [opening a new issue](https://github.com/SvetimFM/transformer-pcn-ui/issues/new).
 
 **Great Bug Reports** tend to have:
 
@@ -56,7 +56,7 @@ We use GitHub issues to track public bugs. Report a bug by [opening a new issue]
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/transformer-pcn-ui.git
+git clone https://github.com/SvetimFM/transformer-pcn-ui.git
 cd transformer-pcn-ui
 ```
 

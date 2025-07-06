@@ -15,9 +15,19 @@ import os
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Import PCN models and utilities
-from pcn_model.network import PredictiveCodingNetwork
-from models.hybrid_pcn_transformer import HybridPCNTransformer
+# Import PCN models and utilities with error handling
+try:
+    from pcn_model.network import PredictiveCodingNetwork
+except ImportError:
+    print("Warning: PCN model not found. PCN experiments will be disabled.")
+    PredictiveCodingNetwork = None
+
+try:
+    from models.hybrid_pcn_transformer import HybridPCNTransformer
+except ImportError:
+    print("Warning: Hybrid PCN Transformer not found. Hybrid models will be disabled.")
+    HybridPCNTransformer = None
+
 from models.bigram import BigramLM
 from utils.dataset_preparation import get_dataset
 from utils.training_utils import batchifier
@@ -57,6 +67,14 @@ class PCNExperimentManager:
     
     async def start_pcn_experiment(self, config: Dict[str, Any]):
         """Start PCN data leakage experiment"""
+        if PredictiveCodingNetwork is None:
+            if self.websocket_callback:
+                await self.websocket_callback({
+                    "type": "error",
+                    "message": "PCN models not available. Please install PCN dependencies."
+                })
+            return
+            
         self.initialize_data()
         self.is_running = True
         self.current_experiment = 'data_leakage'

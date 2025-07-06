@@ -31,7 +31,7 @@ These features are functional but may have limitations or undergo significant ch
 
 ## 📖 Additional Resources
 
-- [Project Repository](https://github.com/yourusername/transformer-pcn-ui)
-- [Issues and Support](https://github.com/yourusername/transformer-pcn-ui/issues)
+- [Project Repository](https://github.com/SvetimFM/transformer-pcn-ui)
+- [Issues and Support](https://github.com/SvetimFM/transformer-pcn-ui/issues)
 - [Original Transformer Paper](https://arxiv.org/abs/1706.03762)
 - [The Illustrated Transformer](https://jalammar.github.io/illustrated-transformer/)

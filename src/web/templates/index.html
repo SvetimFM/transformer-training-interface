@@ -38,6 +38,10 @@
                         Transformers are neural architectures that revolutionized machine learning through <strong>self-attention mechanisms</strong>. 
                         Unlike RNNs, they process sequences in parallel, computing relationships between all positions simultaneously.
                     </p>
+                    <div class="implementation-note">
+                        <strong>📝 Implementation Note:</strong> This interface implements a GPT-style decoder-only transformer optimized for text generation, 
+                        with several modern improvements over the original 2017 paper. Hover over configuration options to learn about these design choices.
+                    </div>
                     <div class="explainer-grid">
                         <div class="explainer-item">
                             <h3>🧠 Self-Attention</h3>
@@ -251,7 +255,7 @@ You are all resolved rather to die than to famish?</pre>
             <!-- Architecture Configuration -->
             <div class="panel" id="arch-panel">
                 <h2 class="tooltip">Model Architecture
-                    <span class="tooltiptext">Configure transformer layers, attention heads, and embedding dimensions. Start simple with 1-2 layers.</span>
+                    <span class="tooltiptext">Configure transformer layers, attention heads, and embedding dimensions. Note: This implements a GPT-style decoder-only architecture (autoregressive) rather than the original paper's encoder-decoder. Benefits: Simpler, better for text generation. Trade-off: No bidirectional context.</span>
                 </h2>
                 <div class="config-group">
                     <label class="switch-label tooltip">
@@ -268,7 +272,7 @@ You are all resolved rather to die than to famish?</pre>
                         <label>Norm Position:</label>
                         <label><input type="radio" name="norm-position" value="pre" checked> Pre</label>
                         <label><input type="radio" name="norm-position" value="post"> Post</label>
-                        <span class="tooltiptext">Pre-norm: LayerNorm before sublayers (more stable). Post-norm: LayerNorm after (original paper, may need warmup).</span>
+                        <span class="tooltiptext">Pre-norm: LayerNorm before sublayers (modern best practice, more stable training). Post-norm: LayerNorm after (original paper design, may need careful warmup). We default to pre-norm as it's more forgiving for learners.</span>
                     </div>
                 </div>
                 
@@ -279,14 +283,14 @@ You are all resolved rather to die than to famish?</pre>
                     <input type="range" id="n-layers" min="1" max="12" value="1" class="slider">
                     
                     <label for="n-embed" class="tooltip">Embed Dim: <span id="n-embed-value">256</span>
-                        <span class="tooltiptext">Dimensionality of token embeddings and hidden states. Must be divisible by number of attention heads.</span>
+                        <span class="tooltiptext">Dimensionality of token embeddings and hidden states. Must be divisible by number of attention heads. Note: We use learned positional embeddings (like GPT) instead of sinusoidal (original paper). Benefits: Can learn task-specific patterns. Trade-off: Doesn't generalize to longer sequences.</span>
                     </label>
                     <input type="range" id="n-embed" min="64" max="1024" step="64" value="256" class="slider">
                     
                     <!-- Simple configuration for single layer -->
                     <div id="simple-config" style="display: block;">
                         <label class="tooltip">Heads: <span id="n-heads-value">8</span>
-                            <span class="tooltiptext">Number of parallel attention heads. Each head learns different relationships. Typical: 8-16 heads.</span>
+                            <span class="tooltiptext">Number of parallel attention heads. Each head learns different relationships (syntax, semantics, position). We offer two implementations: educational (separate heads, easier to understand) and standard (single projection, more efficient). Both produce similar results.</span>
                         </label>
                         <input type="range" id="n-heads" min="1" max="16" value="8" class="slider">
                         
@@ -341,7 +345,7 @@ You are all resolved rather to die than to famish?</pre>
             <!-- Training Parameters -->
             <div class="panel" id="params-panel">
                 <h2 class="tooltip">Training Parameters
-                    <span class="tooltiptext">Set learning rate, batch size, and optimization settings. These control how the model learns.</span>
+                    <span class="tooltiptext">Set learning rate, batch size, and optimization settings. Note: We use AdamW optimizer (modern standard) instead of Adam from the original paper. AdamW decouples weight decay from gradient updates for better generalization.</span>
                 </h2>
                 <div class="input-group">
                     <label class="tooltip">Learning Rate:
@@ -365,7 +369,7 @@ You are all resolved rather to die than to famish?</pre>
                     <input type="number" id="train-steps" placeholder="Auto-calculate from epochs" min="100" max="100000">
                     
                     <label class="tooltip">LR Scheduler:
-                        <span class="tooltiptext">How learning rate changes during training. Warmup+Cosine is standard for transformers.</span>
+                        <span class="tooltiptext">How learning rate changes during training. Warmup+Cosine is modern best practice (smoother than linear decay in original paper). Benefits: Better final performance. Trade-off: Slightly more complex to tune.</span>
                     </label>
                     <select id="scheduler-type">
                         <option value="warmup_cosine">Warmup + Cosine</option>
@@ -390,12 +394,12 @@ You are all resolved rather to die than to famish?</pre>
                     <label class="switch-label tooltip">
                         <input type="checkbox" id="compile-model" class="toggle-switch" checked>
                         <span>Torch Compile</span>
-                        <span class="tooltiptext">JIT compilation for ~2x speedup. May increase startup time. Disable if debugging.</span>
+                        <span class="tooltiptext">PyTorch 2.0+ feature: JIT compilation for ~2x speedup. Not in original paper but essential for modern training. Trade-off: Longer startup time, harder to debug.</span>
                     </label>
                     <label class="switch-label tooltip">
                         <input type="checkbox" id="use-amp" class="toggle-switch" checked>
                         <span>Mixed Precision (FP16)</span>
-                        <span class="tooltiptext">Use 16-bit floats for faster training and less memory. Usually no accuracy loss.</span>
+                        <span class="tooltiptext">Use 16-bit floats for faster training and less memory. Modern optimization not in original paper. Benefits: 2x memory savings, faster training. Trade-off: Rare numerical instabilities.</span>
                     </label>
                     
                     <label class="tooltip">Gradient Accumulation Steps:

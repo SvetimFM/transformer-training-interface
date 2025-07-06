@@ -27,14 +27,28 @@ from visualization.activation_tracker import activation_tracker
 from visualization.attention_capture import attention_capture
 
 # Import PCN managers
-from .pcn_manager import PCNExperimentManager, HybridModelManager
+try:
+    from .pcn_manager import PCNExperimentManager, HybridModelManager
+except ImportError as e:
+    print(f"Warning: Could not import PCN managers: {e}")
+    PCNExperimentManager = None
+    HybridModelManager = None
 
 app = FastAPI(title="Transformer Training UI")
 
 # Add CORS middleware
+# Configure CORS - in production, replace with specific origins
+ALLOWED_ORIGINS = [
+    "http://localhost:8050",
+    "http://localhost:8051",
+    "http://127.0.0.1:8050",
+    "http://127.0.0.1:8051",
+    # Add your production domain here when deploying
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -425,6 +439,20 @@ async def upload_dataset(file: UploadFile = File(...)):
     import shutil
     
     try:
+        # Validate file type
+        if not file.filename.endswith(('.txt', '.text')):
+            raise HTTPException(
+                status_code=400,
+                detail="Only .txt or .text files are allowed"
+            )
+        
+        # Validate content type
+        if file.content_type not in ['text/plain', 'text/x-plain', 'application/text', None]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid content type: {file.content_type}. Only text files are allowed."
+            )
+        
         # Validate file size (50MB limit)
         contents = await file.read()
         size_mb = len(contents) / (1024 * 1024)
@@ -432,6 +460,20 @@ async def upload_dataset(file: UploadFile = File(...)):
             raise HTTPException(
                 status_code=400,
                 detail=f"File too large: {size_mb:.1f}MB > {app_config.dataset.max_file_size_mb}MB limit"
+            )
+        
+        # Basic content validation - ensure it's valid text
+        try:
+            text_content = contents.decode('utf-8')
+            if len(text_content.strip()) < 100:
+                raise HTTPException(
+                    status_code=400,
+                    detail="File content too short. Please provide at least 100 characters of text."
+                )
+        except UnicodeDecodeError:
+            raise HTTPException(
+                status_code=400,
+                detail="File contains invalid characters. Please ensure it's a valid UTF-8 text file."
             )
         
         # Save to temporary file
@@ -529,6 +571,12 @@ async def get_lr_schedule():
 async def start_pcn_experiment(config: dict):
     """Start PCN data leakage experiment"""
     global pcn_manager
+    
+    if PCNExperimentManager is None:
+        raise HTTPException(
+            status_code=501,
+            detail="PCN experiments are not available. Required dependencies may be missing."
+        )
     
     if pcn_manager is None:
         # Create PCN manager with websocket callback

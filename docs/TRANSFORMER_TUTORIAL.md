@@ -62,6 +62,28 @@ Since transformers process all tokens in parallel, they need a way to understand
 
 A transformer consists of stacked layers, each containing:
 
+### Important Implementation Notes
+
+Our implementation makes several modern design choices that differ from the original 2017 paper:
+
+1. **Decoder-Only Architecture**: We implement GPT-style autoregressive transformers rather than encoder-decoder
+   - **Benefit**: Simpler to understand and implement
+   - **Trade-off**: No bidirectional context (can't look ahead)
+
+2. **Learned Positional Embeddings**: Instead of sinusoidal encoding, we learn position embeddings
+   - **Benefit**: Can adapt to specific tasks and datasets
+   - **Trade-off**: Won't generalize to sequences longer than training
+
+3. **Pre-Normalization**: Layer norm before (not after) each sub-layer
+   - **Benefit**: More stable training, especially for beginners
+   - **Trade-off**: Slightly different from original paper
+
+4. **AdamW Optimizer**: Modern optimizer with decoupled weight decay
+   - **Benefit**: Better generalization than original Adam
+   - **Trade-off**: One more hyperparameter to tune
+
+These choices reflect current best practices and make training more forgiving for learners.
+
 ### 1. Multi-Head Attention Layer
 - Computes attention between all token pairs
 - Multiple heads capture different relationships

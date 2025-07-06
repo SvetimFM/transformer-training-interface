@@ -194,7 +194,7 @@ If you use this code in your research, please cite:
   title={Hybrid PCN-Transformer: Biologically-Inspired Language Models},
   author={Your Name},
   year={2024},
-  url={https://github.com/yourusername/pcn-transformer}
+  url={https://github.com/SvetimFM/transformer-pcn-ui}
 }
 ```
 

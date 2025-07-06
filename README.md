@@ -54,7 +54,7 @@ New to transformers? Check out our comprehensive [Transformer Tutorial](docs/TRA
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/transformer-pcn-ui.git
+git clone https://github.com/SvetimFM/transformer-pcn-ui.git
 cd transformer-pcn-ui
 ```
 
@@ -190,7 +190,7 @@ If you use this tool in your research, please cite:
 @software{transformer_pcn_ui,
   title = {Transformer Training UI with PCN Analysis},
   year = {2024},
-  url = {https://github.com/yourusername/transformer-pcn-ui}
+  url = {https://github.com/SvetimFM/transformer-pcn-ui}
 }
 ```
 
