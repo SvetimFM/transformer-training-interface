@@ -6,6 +6,15 @@ An interactive web-based interface for training transformers and analyzing Predi
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-red.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
+## 📚 Tutorial
+
+New to transformers? Check out our comprehensive [Transformer Tutorial](docs/TRANSFORMER_TUTORIAL.md) that covers:
+- Understanding transformer architecture
+- Key concepts explained simply
+- Hands-on training walkthrough
+- Troubleshooting guide
+- Advanced experiments
+
 ## Features
 
 ### 🚀 Standard Transformer Training
@@ -24,7 +33,7 @@ An interactive web-based interface for training transformers and analyzing Predi
   - Correct implementation: ~40-50% accuracy (realistic)
 - Energy distribution and diversity score visualizations
 
-### 🏗️ Hybrid Models (Work in Progress)
+### 🏗️ Hybrid Models (Experimental)
 - PCN-Transformer hybrid architectures
 - Performance comparison with standard transformers
 - Multiple architecture variants:

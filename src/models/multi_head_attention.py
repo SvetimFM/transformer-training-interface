@@ -5,6 +5,14 @@ from torch.nn import functional as F
 
 
 class MultiHeadAttention(nn.Module):
+    """
+    Educational implementation of multi-head attention.
+    Creates separate attention heads as distinct modules.
+    
+    Note: This is not the standard implementation. For the standard
+    implementation used in GPT/BERT, see MultiHeadAttentionStandard.
+    This version is easier to understand but less efficient.
+    """
     def __init__(self, num_heads, n_embed, head_size, batch_size, block_size, dropout=0.2):
         super().__init__()
         self.heads = nn.ModuleList(

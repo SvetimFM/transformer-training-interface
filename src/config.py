@@ -1,5 +1,18 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Literal
+
+class DatasetConfig(BaseModel):
+    dataset_type: Literal["shakespeare", "custom", "url"] = "shakespeare"
+    dataset_path: Optional[str] = None  # Path for custom dataset
+    dataset_url: Optional[str] = None   # URL for remote dataset
+    max_file_size_mb: int = 50         # Maximum file size in MB
+    
+    tokenizer_type: Literal["character", "bpe"] = "character"
+    tokenizer_model: Optional[str] = "gpt2"  # For BPE: gpt2, gpt-3.5-turbo, etc.
+    vocab_size: Optional[int] = None    # None means use all characters/tokens
+    
+    class Config:
+        validate_assignment = True
 
 class ModelConfig(BaseModel):
     vocab_size: int = 65
@@ -12,6 +25,12 @@ class ModelConfig(BaseModel):
     use_layer_norm: bool = False
     use_residual: bool = False
     norm_position: str = "pre"  # "pre" or "post"
+    
+    # Attention configuration
+    use_standard_attention: bool = True  # True for standard multi-head attention, False for educational implementation
+    
+    # Feedforward configuration
+    hidden_multiplier: int = 4  # FFN hidden size = n_embed * hidden_multiplier
     
     # Output layer configuration
     output_activation: str = "gelu"  # "relu", "gelu", "silu", "tanh"
@@ -77,6 +96,7 @@ class LoRAConfig(BaseModel):
 
 class AppConfig:
     def __init__(self):
+        self.dataset = DatasetConfig()
         self.model = ModelConfig()
         self.training = TrainingConfig()
         self.generation = GenerationConfig()
@@ -84,6 +104,7 @@ class AppConfig:
         
     def to_dict(self):
         return {
+            "dataset": self.dataset.model_dump(),
             "model": self.model.model_dump(),
             "training": self.training.model_dump(),
             "generation": self.generation.model_dump(),

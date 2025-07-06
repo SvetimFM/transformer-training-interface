@@ -22,6 +22,8 @@ class BigramLM(nn.Module):
             use_layer_norm = config.model.use_layer_norm
             use_residual = config.model.use_residual
             norm_position = config.model.norm_position
+            use_standard_attention = getattr(config.model, 'use_standard_attention', True)
+            hidden_multiplier = getattr(config.model, 'hidden_multiplier', 4)
             # Output layer configuration
             output_activation = getattr(config.model, 'output_activation', 'gelu')
             n_output_layers = getattr(config.model, 'n_output_layers', 0)
@@ -35,6 +37,8 @@ class BigramLM(nn.Module):
             use_layer_norm = False
             use_residual = False
             norm_position = "pre"
+            use_standard_attention = True
+            hidden_multiplier = 4
             output_activation = "gelu"
             n_output_layers = 0
             output_hidden_dim = n_embed * 2
@@ -53,7 +57,9 @@ class BigramLM(nn.Module):
                 use_layer_norm=use_layer_norm,
                 use_residual=use_residual,
                 norm_position=norm_position,
-                dropout=dropout
+                dropout=dropout,
+                use_standard_attention=use_standard_attention,
+                hidden_multiplier=hidden_multiplier
             ) for _ in range(n_layers)
         ])
         

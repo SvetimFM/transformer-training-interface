@@ -179,34 +179,37 @@ function calculateTotalParams() {
         if (numLayers === 1) {
             const hiddenMult = parseInt(document.getElementById('hidden-mult').value);
             
-            // Attention parameters (Q, K, V, O projections)
+            // Attention parameters with standard implementation:
+            // Q, K, V projections: each is n_embed -> n_embed
+            // Output projection: n_embed -> n_embed
+            // Total: 4 * n_embed * n_embed
             totalParams += 4 * embedDim * embedDim;
             
-            // FFN parameters (Note: backend currently hardcoded to 4x)
-            // TODO: Update backend FeedForward to accept hiddenMult parameter
-            totalParams += embedDim * (4 * embedDim); // First linear (using 4x as per backend)
-            totalParams += (4 * embedDim) * embedDim; // Second linear
+            // FFN parameters (now using configurable hidden multiplier)
+            totalParams += embedDim * (hiddenMult * embedDim); // First linear
+            totalParams += (hiddenMult * embedDim) * embedDim; // Second linear
             
-            // Layer norm parameters (2 per layer)
-            totalParams += 2 * embedDim;
+            // Layer norm parameters (2 per layer: ln1 and ln2)
+            // LayerNorm has 2 params per dimension (weight and bias)
+            totalParams += 2 * embedDim * 2;
         } else {
             for (let i = 0; i < numLayers; i++) {
                 const hiddenMult = parseInt(document.getElementById(`layer-${i}-hidden`)?.value || 4);
                 
-                // Attention parameters
+                // Attention parameters (standard implementation)
                 totalParams += 4 * embedDim * embedDim;
                 
-                // FFN parameters (Note: backend currently hardcoded to 4x)
-                totalParams += embedDim * (4 * embedDim);
-                totalParams += (4 * embedDim) * embedDim;
+                // FFN parameters (now using configurable hidden multiplier)
+                totalParams += embedDim * (hiddenMult * embedDim);
+                totalParams += (hiddenMult * embedDim) * embedDim;
                 
-                // Layer norm parameters
-                totalParams += 2 * embedDim;
+                // Layer norm parameters (2 LayerNorms, each with weight and bias)
+                totalParams += 2 * embedDim * 2;
             }
         }
         
-        // Final layer norm
-        totalParams += embedDim; // Final layer norm
+        // Final layer norm (weight and bias)
+        totalParams += embedDim * 2; // Final layer norm
         
         // Output layers
         const numOutputLayers = parseInt(document.getElementById('n-output-layers').value);
@@ -964,6 +967,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize tab switching
     initTabSwitching();
     
+    // Initialize dataset handlers
+    initDatasetHandlers();
+    
     // Initialize PCN charts on page load
     if (typeof initPCNCharts === 'function') {
         initPCNCharts();
@@ -1057,6 +1063,7 @@ document.addEventListener('DOMContentLoaded', () => {
             n_layers: parseInt(document.getElementById('n-layers').value),
             n_heads: n_heads,
             n_embed: n_embed,
+            hidden_multiplier: parseInt(document.getElementById('hidden-mult').value),
             output_activation: document.getElementById('output-activation').value,
             n_output_layers: parseInt(document.getElementById('n-output-layers').value),
             output_hidden_dim: parseInt(document.getElementById('output-hidden-dim').value)
@@ -1487,5 +1494,165 @@ async function loadMetricsHistory() {
         }
     } catch (error) {
         console.error('Failed to load metrics history:', error);
+    }
+}
+
+// Dataset and Tokenizer Event Handlers
+function initDatasetHandlers() {
+    // Dataset type radio buttons
+    const datasetRadios = document.querySelectorAll('input[name="dataset-type"]');
+    const customDatasetInput = document.getElementById('custom-dataset-input');
+    const urlDatasetInput = document.getElementById('url-dataset-input');
+    
+    datasetRadios.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            // Show/hide appropriate input fields
+            customDatasetInput.style.display = e.target.value === 'custom' ? 'block' : 'none';
+            urlDatasetInput.style.display = e.target.value === 'url' ? 'block' : 'none';
+            
+            // Update dataset info display
+            updateDatasetInfo();
+        });
+    });
+    
+    // File upload handling
+    const datasetFile = document.getElementById('dataset-file');
+    const fileLabel = document.querySelector('label[for="dataset-file"]');
+    
+    if (datasetFile) {
+        datasetFile.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                fileLabel.textContent = file.name;
+                
+                // Upload file
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                try {
+                    const response = await fetch('/api/dataset/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        updateDatasetInfoDisplay(result.info);
+                        alert(`File uploaded successfully: ${result.filename}`);
+                    } else {
+                        const error = await response.json();
+                        alert(`Upload failed: ${error.detail}`);
+                    }
+                } catch (error) {
+                    console.error('Failed to upload file:', error);
+                    alert('Failed to upload file');
+                }
+            }
+        });
+    }
+    
+    // Tokenizer type radio buttons
+    const tokenizerRadios = document.querySelectorAll('input[name="tokenizer-type"]');
+    const bpeOptions = document.getElementById('bpe-options');
+    
+    tokenizerRadios.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            bpeOptions.style.display = e.target.value === 'bpe' ? 'block' : 'none';
+            updateDatasetInfo();
+        });
+    });
+    
+    // Apply dataset & tokenizer button
+    const applyButton = document.getElementById('apply-dataset');
+    if (applyButton) {
+        applyButton.addEventListener('click', async () => {
+            const datasetType = document.querySelector('input[name="dataset-type"]:checked').value;
+            const tokenizerType = document.querySelector('input[name="tokenizer-type"]:checked').value;
+            
+            const config = {
+                dataset_type: datasetType,
+                tokenizer_type: tokenizerType
+            };
+            
+            // Add specific fields based on dataset type
+            if (datasetType === 'url') {
+                config.dataset_url = document.getElementById('dataset-url').value;
+            }
+            
+            // Add tokenizer-specific fields
+            if (tokenizerType === 'bpe') {
+                config.tokenizer_model = document.getElementById('bpe-model').value;
+            }
+            
+            try {
+                const response = await fetch('/api/dataset/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    updateDatasetInfoDisplay(result.info);
+                    
+                    // Reinitialize model with new tokenizer
+                    const reinitResponse = await fetch('/api/config', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ dataset: result.config })
+                    });
+                    
+                    if (reinitResponse.ok) {
+                        const configResult = await reinitResponse.json();
+                        currentConfig = configResult.config;
+                        calculateTotalParams();
+                        alert('Dataset and tokenizer applied successfully!');
+                    }
+                } else {
+                    const error = await response.json();
+                    alert(`Failed to apply configuration: ${error.detail}`);
+                }
+            } catch (error) {
+                console.error('Failed to apply dataset config:', error);
+                alert('Failed to apply dataset configuration');
+            }
+        });
+    }
+    
+    // Advanced section expand/collapse
+    const advancedHeader = document.querySelector('.advanced-header');
+    const advancedContent = document.querySelector('.advanced-content');
+    const expandIcon = document.querySelector('.expand-icon');
+    
+    if (advancedHeader) {
+        advancedHeader.addEventListener('click', () => {
+            const isExpanded = advancedContent.parentElement.open;
+            expandIcon.style.transform = isExpanded ? 'rotate(0deg)' : 'rotate(90deg)';
+        });
+    }
+}
+
+// Update dataset info display
+function updateDatasetInfoDisplay(info) {
+    if (!info) return;
+    
+    document.getElementById('dataset-size').textContent = `${info.size_mb.toFixed(1)} MB`;
+    document.getElementById('dataset-chars').textContent = info.character_count.toLocaleString();
+    document.getElementById('vocab-size').textContent = `${info.vocab_size || info.unique_chars} ${info.vocab_size ? 'tokens' : 'chars'}`;
+    document.getElementById('token-count').textContent = info.estimated_tokens ? 
+        `${(info.estimated_tokens / 1000).toFixed(0)}K` : 
+        `${(info.character_count / 1000).toFixed(0)}K`;
+}
+
+// Get current dataset info
+async function updateDatasetInfo() {
+    try {
+        const response = await fetch('/api/dataset/info');
+        if (response.ok) {
+            const result = await response.json();
+            updateDatasetInfoDisplay(result.info);
+        }
+    } catch (error) {
+        console.error('Failed to get dataset info:', error);
     }
 }

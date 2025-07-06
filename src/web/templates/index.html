@@ -21,8 +21,8 @@
                 <button class="dropdown-button">Experiments ▼</button>
                 <div class="dropdown-content">
                     <button class="tab-button" data-tab="pcn-experiments">PCN Experiments</button>
-                    <button class="tab-button" data-tab="hybrid-models">Hybrid Models (WIP!)</button>
-                    <button class="tab-button" data-tab="multi-lora">Multi-LoRA (WIP!)</button>
+                    <button class="tab-button" data-tab="hybrid-models">Hybrid Models (Experimental)</button>
+                    <button class="tab-button" data-tab="multi-lora">Multi-LoRA (Experimental)</button>
                 </div>
             </div>
         </div>
@@ -110,6 +110,118 @@
                             <li>Temperature 0.8-1.0 works well for Shakespeare-style text</li>
                         </ul>
                     </div>
+                </div>
+                
+                <!-- Advanced Dataset & Tokenizer Section -->
+                <div class="advanced-section">
+                    <details>
+                        <summary class="advanced-header">
+                            <h3>🔧 Advanced: Custom Datasets & Tokenizers</h3>
+                            <span class="expand-icon">▶</span>
+                        </summary>
+                        <div class="advanced-content">
+                            <div class="dataset-panel">
+                                <h4>📄 Dataset Options</h4>
+                                <div class="dataset-options">
+                                    <label class="radio-option">
+                                        <input type="radio" name="dataset-type" value="shakespeare" checked>
+                                        <span class="option-label">Tiny Shakespeare (Default)</span>
+                                        <p class="option-desc">~1MB of Shakespeare's works, perfect for learning</p>
+                                    </label>
+                                    <label class="radio-option">
+                                        <input type="radio" name="dataset-type" value="custom">
+                                        <span class="option-label">Upload Custom Text</span>
+                                        <p class="option-desc">Train on your own text (max 50MB)</p>
+                                    </label>
+                                    <label class="radio-option">
+                                        <input type="radio" name="dataset-type" value="url">
+                                        <span class="option-label">Load from URL</span>
+                                        <p class="option-desc">Download text from a URL (cached locally)</p>
+                                    </label>
+                                </div>
+                                
+                                <div id="custom-dataset-input" class="dataset-input" style="display: none;">
+                                    <input type="file" id="dataset-file" accept=".txt" class="file-input">
+                                    <label for="dataset-file" class="file-label">Choose text file...</label>
+                                </div>
+                                
+                                <div id="url-dataset-input" class="dataset-input" style="display: none;">
+                                    <input type="url" id="dataset-url" placeholder="https://example.com/text.txt" class="url-input">
+                                </div>
+                            </div>
+                            
+                            <div class="tokenizer-panel">
+                                <h4>🔤 Tokenizer Options</h4>
+                                <div class="tokenizer-options">
+                                    <label class="radio-option">
+                                        <input type="radio" name="tokenizer-type" value="character" checked>
+                                        <span class="option-label">Character-level</span>
+                                        <p class="option-desc">Each character = 1 token. Simple, works with any text</p>
+                                    </label>
+                                    <label class="radio-option">
+                                        <input type="radio" name="tokenizer-type" value="bpe">
+                                        <span class="option-label">BPE (Byte-Pair Encoding)</span>
+                                        <p class="option-desc">Subword tokens like GPT. More efficient, requires tiktoken</p>
+                                    </label>
+                                </div>
+                                
+                                <div id="bpe-options" class="tokenizer-config" style="display: none;">
+                                    <label>BPE Model:</label>
+                                    <select id="bpe-model" class="form-select">
+                                        <option value="gpt2">GPT-2 (50k vocab)</option>
+                                        <option value="gpt-3.5-turbo">GPT-3.5 (100k vocab)</option>
+                                        <option value="custom">Train on dataset</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="dataset-info">
+                                <h4>📊 Dataset Information</h4>
+                                <div class="info-grid">
+                                    <div class="info-item">
+                                        <span class="info-label">File Size:</span>
+                                        <span class="info-value" id="dataset-size">1.1 MB</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Characters:</span>
+                                        <span class="info-value" id="dataset-chars">1,115,394</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Vocabulary:</span>
+                                        <span class="info-value" id="vocab-size">65 chars</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Est. Tokens:</span>
+                                        <span class="info-value" id="token-count">1.1M</span>
+                                    </div>
+                                </div>
+                                <div class="dataset-preview">
+                                    <h5>Preview:</h5>
+                                    <pre id="dataset-preview-text">First Citizen:
+Before we proceed any further, hear me speak.
+
+All:
+Speak, speak.
+
+First Citizen:
+You are all resolved rather to die than to famish?</pre>
+                                </div>
+                            </div>
+                            
+                            <div class="advanced-tips">
+                                <h4>💡 Tips for Custom Datasets</h4>
+                                <ul>
+                                    <li><strong>Character tokenizer:</strong> Best for structured text (code, poetry) or non-English languages</li>
+                                    <li><strong>BPE tokenizer:</strong> Better for natural language, reduces sequence length by ~4x</li>
+                                    <li><strong>Dataset size:</strong> Aim for at least 1MB of text for good results</li>
+                                    <li><strong>Model size:</strong> Scale model parameters with dataset size (1M chars ≈ 1M params)</li>
+                                    <li><strong>Unicode:</strong> Character tokenizer handles any Unicode text automatically</li>
+                                </ul>
+                            </div>
+                            
+                            <button id="apply-dataset" class="btn btn-secondary">Apply Dataset & Tokenizer</button>
+                        </div>
+                    </details>
                 </div>
                 
                 <div class="main-grid">
@@ -327,7 +439,7 @@
             
             <!-- Architecture Visualization -->
             <div class="panel chart-panel" id="architecture-panel">
-                <h2>Model Architecture (WIP!)</h2>
+                <h2>Model Architecture (Experimental)</h2>
                 <div class="architecture-controls">
                     <button id="reset-zoom">Reset View</button>
                     <button id="toggle-animations">Toggle Animations</button>

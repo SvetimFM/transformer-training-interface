@@ -1,5 +1,9 @@
 # Transformer PCN UI - Project Summary
 
+## 📚 Getting Started
+- **New to transformers?** Start with our [comprehensive tutorial](docs/TRANSFORMER_TUTORIAL.md)
+- **Quick Start**: Follow the installation steps below and visit http://localhost:8050
+
 ## Overview
 
 This project provides an interactive web-based interface for training transformers and analyzing Predictive Coding Networks (PCNs), with a special focus on demonstrating the label leakage issue in recent PCN research.

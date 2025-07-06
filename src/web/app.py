@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket, HTTPException
+from fastapi import FastAPI, WebSocket, HTTPException, File, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,10 +14,11 @@ import threading
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from config import app_config, ModelConfig, TrainingConfig, GenerationConfig
+from config import app_config, ModelConfig, TrainingConfig, GenerationConfig, DatasetConfig
 from models.bigram import BigramLM
 from training.trainer import Trainer
 from utils.dataset_preparation import get_dataset
+from utils.dataset_manager import DatasetManager
 from utils.training_utils import batchifier
 import torch.nn.functional as F
 from visualization.hooks import register_model_components
@@ -50,6 +51,7 @@ train_data = None
 val_data = None
 websocket_clients = []
 metrics_queue = queue.Queue()
+dataset_manager = None  # DatasetManager instance
 
 # PCN managers
 pcn_manager = None
@@ -60,6 +62,7 @@ class ConfigUpdate(BaseModel):
     model: dict = None
     training: dict = None
     generation: dict = None
+    dataset: dict = None
 
 class GenerateRequest(BaseModel):
     prompt: str
@@ -72,27 +75,42 @@ class TrainingControl(BaseModel):
 class AttentionCaptureRequest(BaseModel):
     text: str = "The quick brown fox jumps over the lazy dog"
 
+class DatasetConfigRequest(BaseModel):
+    dataset_type: str = "shakespeare"
+    dataset_path: str = None
+    dataset_url: str = None
+    tokenizer_type: str = "character"
+    tokenizer_model: str = "gpt2"
+    vocab_size: int = None
+
 # Initialize model and data
 def initialize_model():
-    global model, vocab, vocab_size, encode, decode, train_data, val_data, trainer
+    global model, vocab, vocab_size, encode, decode, train_data, val_data, trainer, dataset_manager
     
     try:
-        # Load dataset
-        dataset = get_dataset()
-        vocab = sorted(list(set(dataset)))
-        vocab_size = len(vocab)
+        # Initialize or use existing dataset manager
+        if dataset_manager is None:
+            dataset_manager = DatasetManager(app_config.dataset)
         
-        # Update config
+        # Load dataset and create tokenizer
+        dataset_text, tokenizer, dataset_info = dataset_manager.prepare_data()
+        
+        # Update global tokenizer functions
+        encode = tokenizer.encode
+        decode = tokenizer.decode
+        vocab_size = tokenizer.vocab_size()
+        
+        # For character tokenizer, maintain vocab for compatibility
+        if hasattr(tokenizer, 'char_to_id'):
+            vocab = list(tokenizer.char_to_id.keys())
+        else:
+            vocab = None
+        
+        # Update config with actual vocab size
         app_config.model.vocab_size = vocab_size
         
-        # Create mappings
-        string_to_integer_map = {c: i for i, c in enumerate(vocab)}
-        integer_to_string_map = {i: c for i, c in enumerate(vocab)}
-        encode = lambda s: [string_to_integer_map[c] for c in s]
-        decode = lambda l: "".join([integer_to_string_map[i] for i in l])
-        
-        # Prepare data
-        data = torch.tensor(encode(dataset), dtype=torch.long)
+        # Prepare data using tokenizer
+        data = torch.tensor(encode(dataset_text), dtype=torch.long)
         train_size = int(app_config.training.train_split * len(data))
         train_data = data[:train_size].to(app_config.training.device)
         val_data = data[train_size:].to(app_config.training.device)
@@ -116,9 +134,12 @@ def initialize_model():
         trainer.add_callback("on_eval", broadcast_metrics)
         trainer.add_callback("on_training_end", broadcast_training_complete)
         
+        print(f"Model initialized with {vocab_size} vocabulary size using {app_config.dataset.tokenizer_type} tokenizer")
         return True
     except Exception as e:
         print(f"Error initializing model: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 # WebSocket connection manager
@@ -220,12 +241,19 @@ async def get_config():
 
 @app.post("/api/config")
 async def update_config(config_update: ConfigUpdate):
-    global model, trainer
+    global model, trainer, dataset_manager
     
     try:
         # Update configuration
         model_updated = False
         training_updated = False
+        dataset_updated = False
+        
+        if config_update.dataset:
+            app_config.dataset = DatasetConfig(**config_update.dataset)
+            dataset_updated = True
+            # Reinitialize dataset manager with new config
+            dataset_manager = DatasetManager(app_config.dataset)
         
         if config_update.model:
             # Validate model configuration
@@ -259,12 +287,12 @@ async def update_config(config_update: ConfigUpdate):
         if config_update.generation:
             app_config.generation = GenerationConfig(**config_update.generation)
         
-        # Reinitialize model if model config changed
-        if model_updated and model is not None:
+        # Reinitialize model if model config or dataset changed
+        if (model_updated or dataset_updated) and model is not None:
             initialize_model()
         
         # Update scheduler if only training config changed (lighter than full reinit)
-        elif training_updated and trainer is not None and not model_updated:
+        elif training_updated and trainer is not None and not model_updated and not dataset_updated:
             # Update the scheduler without reinitializing everything
             trainer.update_scheduler()
         
@@ -343,6 +371,90 @@ async def generate_text(request: GenerateRequest):
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/dataset/config")
+async def update_dataset_config(dataset_config: DatasetConfigRequest):
+    """Update dataset and tokenizer configuration"""
+    global dataset_manager
+    
+    try:
+        # Update dataset configuration
+        app_config.dataset.dataset_type = dataset_config.dataset_type
+        app_config.dataset.dataset_path = dataset_config.dataset_path
+        app_config.dataset.dataset_url = dataset_config.dataset_url
+        app_config.dataset.tokenizer_type = dataset_config.tokenizer_type
+        app_config.dataset.tokenizer_model = dataset_config.tokenizer_model
+        app_config.dataset.vocab_size = dataset_config.vocab_size
+        
+        # Reinitialize dataset manager
+        dataset_manager = DatasetManager(app_config.dataset)
+        
+        # Get dataset info for response
+        dataset_info = dataset_manager.get_dataset_info()
+        
+        return {
+            "status": "success",
+            "config": app_config.dataset.model_dump(),
+            "info": dataset_info
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/dataset/info")
+async def get_dataset_info():
+    """Get information about the current dataset"""
+    global dataset_manager
+    
+    if dataset_manager is None:
+        dataset_manager = DatasetManager(app_config.dataset)
+    
+    try:
+        info = dataset_manager.get_dataset_info()
+        return {
+            "status": "success",
+            "info": info,
+            "config": app_config.dataset.model_dump()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/dataset/upload")
+async def upload_dataset(file: UploadFile = File(...)):
+    """Handle custom dataset file upload"""
+    import tempfile
+    import shutil
+    
+    try:
+        # Validate file size (50MB limit)
+        contents = await file.read()
+        size_mb = len(contents) / (1024 * 1024)
+        if size_mb > app_config.dataset.max_file_size_mb:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File too large: {size_mb:.1f}MB > {app_config.dataset.max_file_size_mb}MB limit"
+            )
+        
+        # Save to temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as tmp_file:
+            tmp_file.write(contents)
+            tmp_path = tmp_file.name
+        
+        # Update configuration
+        app_config.dataset.dataset_type = "custom"
+        app_config.dataset.dataset_path = tmp_path
+        
+        # Reinitialize dataset manager
+        dataset_manager = DatasetManager(app_config.dataset)
+        info = dataset_manager.get_dataset_info()
+        
+        return {
+            "status": "success",
+            "filename": file.filename,
+            "size_mb": size_mb,
+            "info": info
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/api/metrics/history")
 async def get_metrics_history():
