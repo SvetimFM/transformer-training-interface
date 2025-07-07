@@ -1,8 +1,8 @@
-# PyTorch with CUDA support
-torch==2.5.1+cu121
-torchvision==0.20.1+cu121
-torchaudio==2.5.1+cu121
---index-url https://download.pytorch.org/whl/cu121
+# PyTorch - CPU version by default (for easier installation)
+# For CUDA support, install PyTorch separately:
+# pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+torch>=2.0.0
+torchvision>=0.15.0
 
 # Core dependencies
 numpy==2.1.2
@@ -20,8 +20,8 @@ matplotlib>=3.7.0
 plotly==5.24.1
 pandas==2.2.3
 
-# Optional UI (Streamlit)
-streamlit==1.40.2
+# Optional UI (Streamlit) - not used in main app
+# streamlit==1.40.2
 
 # Transformer ecosystem
 transformers==4.46.3

@@ -55,8 +55,11 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 # Install dependencies
 pip install -r requirements.txt
 
+# (Optional) For GPU support, install CUDA version of PyTorch:
+# pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+
 # Run the application
-python -m src.web.app
+python run_ui.py
 ```
 
 Navigate to `http://localhost:8000` to access the interface.

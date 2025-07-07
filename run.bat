@@ -1,5 +1,5 @@
 @echo off
-REM Run script for Transformer PCN UI on Windows
+REM Run script for Transformer Training Interface on Windows
 
 REM Check if virtual environment exists
 if not exist "venv" (
@@ -27,6 +27,6 @@ if errorlevel 1 (
 )
 
 REM Run the application
-echo Starting Transformer PCN UI...
+echo Starting Transformer Training Interface...
 echo Open your browser at http://localhost:8000
 python run_ui.py

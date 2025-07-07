@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run script for Transformer PCN UI
+# Run script for Transformer Training Interface
 
 # Check if virtual environment exists
 if [ ! -d "venv" ]; then
@@ -26,6 +26,6 @@ if ! python -c "import torch" 2>/dev/null; then
 fi
 
 # Run the application
-echo "Starting Transformer PCN UI..."
+echo "Starting Transformer Training Interface..."
 echo "Open your browser at http://localhost:8000"
 python run_ui.py
