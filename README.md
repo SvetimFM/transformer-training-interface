@@ -1,6 +1,6 @@
-# Transformer Training UI with PCN Analysis
+# Transformer Training Interface
 
-An interactive web-based interface for training transformers and analyzing Predictive Coding Networks (PCNs). This project includes a comprehensive demonstration of the label leakage issue found in recent PCN research.
+An educational implementation of transformer neural networks with a web-based training interface. This project demonstrates modern transformer architectures with interactive visualizations for learning and experimentation.
 
 ![Python](https://img.shields.io/badge/python-3.10+-blue.svg)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-red.svg)
@@ -17,217 +17,166 @@ New to transformers? Check out our comprehensive [Transformer Tutorial](docs/TRA
 
 ## Features
 
-### 🚀 Standard Transformer Training
-- Real-time training visualization with loss curves
-- Configurable architecture (layers, heads, dimensions)
-- Learning rate scheduling with warmup and cosine annealing
-- Gradient accumulation and mixed precision training
-- Interactive architecture visualization
-- Text generation with attention pattern analysis
+### Core Functionality
+- **Interactive Transformer Training**: Train GPT-style decoder-only transformers with real-time metrics
+- **Multiple Tokenization Options**: Character-level and BPE tokenization support
+- **Dataset Flexibility**: Built-in datasets (Shakespeare, Wikipedia) or upload custom text
+- **Real-time Visualizations**: 
+  - Loss curves and training metrics
+  - Architecture visualization with D3.js
+  - Attention pattern analysis
+  - Learning rate schedules
+  - Activation states during training
 
-### 🔬 PCN Experiments
-- **Label Leakage Analysis**: Demonstrates the critical flaw in PCN evaluation methodology
-- Side-by-side comparison of problematic vs correct implementation
-- Real-time accuracy tracking showing:
-  - Problematic implementation: ~99.92% accuracy (unrealistic)
-  - Correct implementation: ~40-50% accuracy (realistic)
-- Energy distribution and diversity score visualizations
+### Educational Design
+- **Comprehensive Tutorial**: Step-by-step guide from transformer basics to advanced concepts
+- **Implementation Transparency**: Tooltips explain architectural choices and trade-offs
+- **Modern Best Practices**: Implements current techniques (AdamW, cosine scheduling, pre-norm)
+- **Proven Recipes**: Pre-configured settings for different compute budgets
 
-### 🏗️ Hybrid Models (Experimental)
-- PCN-Transformer hybrid architectures
-- Performance comparison with standard transformers
-- Multiple architecture variants:
-  - PCN-FF: PCN replaces feedforward networks
-  - Alternating: Attention ↔ PCN layers
-  - Hierarchical: PCN features → Transformer
-  - Dual-Stream: Parallel PCN + Transformer
-  - PCN-Positional: Adaptive positional encoding
-
-## Installation
+## Quick Start
 
 ### Prerequisites
 - Python 3.10 or higher
 - CUDA-capable GPU (optional but recommended)
 - 4GB+ RAM
 
-### Setup
+### Installation
 
-1. Clone the repository:
 ```bash
-git clone https://github.com/SvetimFM/transformer-pcn-ui.git
-cd transformer-pcn-ui
-```
+# Clone the repository
+git clone <repository-url>
+cd transformer-training-interface
 
-2. Create a virtual environment:
-```bash
+# Create a virtual environment
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
 
-3. Install dependencies:
-```bash
+# Install dependencies
 pip install -r requirements.txt
+
+# Run the application
+python -m src.web.app
 ```
 
-4. Download the Shakespeare dataset (auto-downloads on first run)
+Navigate to `http://localhost:8000` to access the interface.
 
-## Usage
+### Basic Usage
 
-### Starting the UI
+1. **Choose a Recipe**: Start with the "Beginner" configuration for quick results
+2. **Select Dataset**: Shakespeare is pre-loaded and works well for demos
+3. **Configure Model**: Adjust layers, heads, and embedding dimensions
+4. **Start Training**: Click "Start Training" and watch real-time metrics
+5. **Generate Text**: Use the generation panel to sample from your model
+6. **Analyze Attention**: Click "View Attention Patterns" to visualize what the model learns
 
-```bash
-python run_ui.py
-```
+## Architecture
 
-The UI will be available at `http://localhost:8000`
+### Model Implementation
+- **Decoder-only Transformer**: GPT-style architecture optimized for text generation
+- **Learned Positional Embeddings**: More flexible than sinusoidal for specific tasks
+- **Pre-LayerNorm**: More stable training than post-norm
+- **Separate Attention Heads**: Educational implementation for better understanding
 
-### Configuration
-
-The application uses a configuration system that can be modified through the UI or by editing `config.py`:
-
-- **Model Configuration**: Adjust transformer architecture parameters
-- **Training Configuration**: Set batch size, learning rate, epochs, etc.
-- **Generation Configuration**: Control text generation parameters
-
-### Key Features Usage
-
-#### 1. Standard Transformer Training
-- Navigate to the "Standard Transformer" tab
-- Configure model architecture using the sliders
-- Click "Apply Architecture" to update the model
-- Click "Start Training" to begin training
-- Monitor real-time metrics and loss curves
-
-#### 2. PCN Label Leakage Experiment
-- Navigate to the "PCN Experiments" tab
-- Click "Run Comparison" to start the experiment
-- Observe the dramatic difference between:
-  - **With Label Leakage**: Shows unrealistic ~99.92% accuracy
-  - **Without Label Leakage**: Shows realistic ~40-50% accuracy
-- Review the code comparison showing the exact issue
-
-#### 3. Text Generation
-- After training, use the text generation panel
-- Enter a prompt and adjust temperature/max tokens
-- Click "Generate" to see model output
-- Click "View Attention Patterns" for detailed analysis
-
-## Understanding the PCN Label Leakage Issue
-
-The PCN experiment demonstrates a critical flaw found in the paper ["Introduction to Predictive Coding Networks for Machine Learning"](https://arxiv.org/pdf/2506.06332):
-
-### The Problem
-During testing, the paper's implementation uses true labels to update internal representations:
-
-```python
-# Problematic code from the paper:
-eps_sup = y_hat - y_batch  # y_batch contains TRUE LABELS during testing!
-# This error is then used to update the model's internal state
-```
-
-### Why It's Wrong
-1. Test labels should NEVER be available during inference
-2. The model gets 50 steps to "correct" itself using the true answer
-3. This leads to unrealistic 99.92% accuracy claims
-
-### Correct Approach
-Testing should only use model predictions without access to true labels:
-```python
-# Correct implementation:
-logits = model(x)
-predictions = logits.argmax(dim=1)
-# No label information used during inference
-```
+### Training Features
+- **Mixed Precision Training**: Optional FP16 for faster training
+- **Gradient Accumulation**: Simulate larger batches on limited hardware
+- **Learning Rate Scheduling**: Warmup + cosine decay
+- **PyTorch 2.0 Compilation**: Optional torch.compile for performance
 
 ## Project Structure
 
 ```
+transformer-training-interface/
 ├── src/
-│   ├── web/
-│   │   ├── app.py              # FastAPI application
-│   │   ├── pcn_manager.py      # PCN experiment manager
-│   │   ├── static/             # Frontend assets
-│   │   └── templates/          # HTML templates
-│   ├── models/
-│   │   ├── bigram.py           # Transformer implementation
-│   │   └── pcn_layers.py       # PCN components
-│   ├── training/
-│   │   └── trainer.py          # Training logic
-│   └── visualization/
-│       └── hooks.py            # Architecture visualization
-├── config.py                   # Configuration management
-├── run_ui.py                   # Entry point
-└── requirements.txt            # Dependencies
+│   ├── models/           # Transformer implementation
+│   ├── training/         # Training loop and utilities
+│   ├── visualization/    # Real-time metrics and viz
+│   ├── tokenizers/       # Character and BPE tokenizers
+│   ├── utils/            # Dataset handling, utilities
+│   └── web/              # FastAPI web interface
+├── docs/                 # Tutorials and documentation
+├── tests/                # Unit tests
+└── requirements.txt      # Python dependencies
 ```
 
-## API Endpoints
+## Configuration Options
+
+### Model Parameters
+- `n_layers`: Number of transformer blocks (1-12)
+- `n_heads`: Attention heads per layer (1-16)
+- `n_embed`: Embedding dimension (64-1024)
+- `block_size`: Maximum sequence length (32-512)
+- `dropout`: Dropout probability (0.0-0.5)
+
+### Training Parameters
+- `batch_size`: Training batch size (4-128)
+- `learning_rate`: Initial learning rate (1e-5 to 1e-3)
+- `num_epochs`: Training epochs (1-100)
+- `grad_accumulation_steps`: Gradient accumulation (1-16)
+- `warmup_steps`: Learning rate warmup steps
+- `lr_scheduler`: "cosine" or "linear"
+
+### Generation Parameters
+- `temperature`: Sampling temperature (0.1-2.0)
+- `top_k`: Top-k sampling (0 = disabled)
+- `top_p`: Nucleus sampling threshold (0.0-1.0)
+
+## Recipes for Success
+
+### Tiny Shakespeare Dataset
+
+#### Beginner (Fast Training)
+- **Layers**: 2, **Heads**: 4, **Embed Dim**: 128
+- **Batch Size**: 64, **Learning Rate**: 3e-4
+- ~300K parameters, trains in minutes
+
+#### Intermediate (Better Quality)
+- **Layers**: 4, **Heads**: 8, **Embed Dim**: 256
+- **Batch Size**: 32, **Learning Rate**: 2e-4
+- ~2.5M parameters, good results
+
+#### Advanced (Best Quality)
+- **Layers**: 6, **Heads**: 6, **Embed Dim**: 384
+- **Batch Size**: 16, **Learning Rate**: 1e-4
+- ~10M parameters, authentic Shakespeare
+
+## API Documentation
 
 The application provides a REST API for programmatic access:
 
-- `GET /api/config` - Get current configuration
-- `POST /api/config` - Update configuration
-- `POST /api/train` - Start/stop training
-- `GET /api/train/status` - Get training status
-- `POST /api/generate` - Generate text
-- `POST /api/pcn/start-experiment` - Start PCN experiment
-- `WebSocket /ws` - Real-time metrics streaming
+- `GET /api/config`: Get current configuration
+- `POST /api/config`: Update configuration
+- `POST /api/train`: Start/stop training
+- `GET /api/train/status`: Get training status
+- `POST /api/generate`: Generate text
+- `GET /api/metrics/history`: Get training history
+- `POST /api/attention/capture`: Capture attention patterns
+- `GET /api/architecture`: Get model architecture graph
 
 ## Contributing
 
-We welcome contributions! Please:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## Citation
-
-If you use this tool in your research, please cite:
-
-```bibtex
-@software{transformer_pcn_ui,
-  title = {Transformer Training UI with PCN Analysis},
-  year = {2024},
-  url = {https://github.com/SvetimFM/transformer-pcn-ui}
-}
-```
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Acknowledgments
 
-- Built with PyTorch, FastAPI, and Chart.js
-- Inspired by the need for transparent ML research
-- Thanks to the open-source community
+- Based on the seminal "Attention Is All You Need" paper
+- Inspired by Andrej Karpathy's educational implementations
+- Uses modern best practices from the transformer community
 
-## Troubleshooting
+## Citation
 
-### Common Issues
+If you use this project in your research or teaching, please cite:
 
-1. **CUDA out of memory**: Reduce batch size or model dimensions
-2. **Port already in use**: Change port in `run_ui.py` or kill existing process
-3. **Module not found**: Ensure all dependencies are installed with `pip install -r requirements.txt`
-
-### Debug Mode
-
-Enable debug logging:
-```bash
-export LOG_LEVEL=DEBUG  # On Windows: set LOG_LEVEL=DEBUG
-python run_ui.py
+```bibtex
+@software{transformer_training_interface,
+  title = {Transformer Training Interface},
+  author = {[Your Name]},
+  year = {2024},
+  url = {https://github.com/yourusername/transformer-training-interface}
+}
 ```
-
-## Future Work
-
-- [ ] Complete hybrid model implementations
-- [ ] Add more datasets beyond Shakespeare
-- [ ] Implement model checkpointing
-- [ ] Add distributed training support
-- [ ] Create Docker container for easy deployment
-
----
-
-**Note**: The PCN label leakage demonstration is for educational purposes to highlight the importance of proper evaluation methodology in machine learning research.

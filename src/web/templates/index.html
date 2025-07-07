@@ -6,7 +6,6 @@
     <title>Transformer Training UI</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="/static/architecture.css">
-    <link rel="stylesheet" href="/static/pcn_styles.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
@@ -16,15 +15,7 @@
         
         <!-- Tab Navigation -->
         <div class="tab-navigation">
-            <button class="tab-button active" data-tab="transformer">Standard Transformer</button>
-            <div class="dropdown">
-                <button class="dropdown-button">Experiments ▼</button>
-                <div class="dropdown-content">
-                    <button class="tab-button" data-tab="pcn-experiments">PCN Experiments</button>
-                    <button class="tab-button" data-tab="hybrid-models">Hybrid Models (Experimental)</button>
-                    <button class="tab-button" data-tab="multi-lora">Multi-LoRA (Experimental)</button>
-                </div>
-            </div>
+            <button class="tab-button active" data-tab="transformer">Transformer Training</button>
         </div>
         
         <!-- Tab Content -->
@@ -513,8 +504,13 @@ You are all resolved rather to die than to famish?</pre>
                     </div>
                 </div>
             </div>
-            
-            <!-- PCN Experiments Tab -->
+        </div>
+    </div>
+    
+    <script src="/static/architecture.js?v=1.0.0"></script>
+    <script src="/static/main.js?v=1.0.0"></script>
+</body>
+</html>
             <div id="pcn-experiments-tab" class="tab-panel">
                 <div class="main-grid">
                     <!-- Data Leakage Demonstration Panel -->

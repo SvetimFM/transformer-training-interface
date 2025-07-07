@@ -51,53 +51,11 @@ function initTabSwitching() {
             }
             
             // Initialize tab-specific content if needed
-            if (targetTab === 'pcn-experiments') {
-                initPCNExperiments();
-            } else if (targetTab === 'hybrid-models') {
-                initHybridModels();
-            }
         });
     });
 }
 
-// Initialize PCN Experiments tab
-function initPCNExperiments() {
-    // Initialize PCN charts if they haven't been created yet
-    if (typeof initPCNCharts === 'function') {
-        initPCNCharts();
-    }
-}
-
-// Initialize Hybrid Models tab
-function initHybridModels() {
-    // Initialize hybrid architecture visualization
-    if (typeof initHybridArchitecture === 'function') {
-        initHybridArchitecture();
-    }
-    
-    // Update architecture description on selection change
-    const archSelector = document.getElementById('hybrid-architecture');
-    if (archSelector && !archSelector.hasListener) {
-        archSelector.hasListener = true;
-        archSelector.addEventListener('change', updateArchitectureDescription);
-    }
-}
-
-// Update architecture description based on selection
-function updateArchitectureDescription() {
-    const archSelector = document.getElementById('hybrid-architecture');
-    const descriptionDiv = document.getElementById('arch-description');
-    
-    const descriptions = {
-        'pcn-ff': 'PCN replaces the feedforward networks in transformer blocks, bringing biological plausibility to the computation-heavy MLP layers.',
-        'alternating': 'Alternates between attention and PCN layers, allowing each mechanism to specialize in different aspects of sequence processing.',
-        'hierarchical': 'PCN processes features at a lower level, then passes refined representations to the transformer for sequence modeling.',
-        'dual-stream': 'Runs PCN and transformer in parallel streams, combining their outputs for richer representations.',
-        'pcn-positional': 'Uses PCN to learn adaptive positional encodings that adjust based on the input context.'
-    };
-    
-    descriptionDiv.innerHTML = `<p>${descriptions[archSelector.value] || 'Select an architecture to see its description.'}</p>`;
-}
+// Removed experimental tab initialization functions
 
 // Update layer configuration based on number of layers
 function updateLayerConfig(numLayers) {
@@ -243,88 +201,7 @@ function calculateTotalParams() {
     }
 }
 
-// PCN WebSocket handlers
-function updatePCNMetrics(data) {
-    if (data.experiment === 'data_leakage') {
-        // Update accuracy displays (with null checks)
-        const accuracyLeaked = document.getElementById('pcn-accuracy-leaked');
-        const accuracyClean = document.getElementById('pcn-accuracy-clean');
-        const stepsLeaked = document.getElementById('pcn-steps-leaked');
-        const stepsClean = document.getElementById('pcn-steps-clean');
-        
-        if (accuracyLeaked) accuracyLeaked.textContent = data.accuracy_claimed.toFixed(2) + '%';
-        if (accuracyClean) accuracyClean.textContent = data.accuracy_realistic.toFixed(2) + '%';
-        if (stepsLeaked) stepsLeaked.textContent = data.inference_steps;
-        if (stepsClean) stepsClean.textContent = data.inference_steps;
-        
-        // Update comparison chart
-        if (typeof updatePCNComparison === 'function') {
-            updatePCNComparison(data.accuracy_claimed, data.accuracy_realistic, data.epoch);
-        }
-        
-        // Update experiment outputs
-        const leakedOutput = document.getElementById('pcn-output-leaked');
-        const cleanOutput = document.getElementById('pcn-output-clean');
-        
-        if (leakedOutput) {
-            leakedOutput.innerHTML = `
-                <div class="output-metric"><strong>Epoch:</strong> ${data.epoch + 1}</div>
-                <div class="output-metric"><strong>Accuracy:</strong> ${data.accuracy_claimed.toFixed(2)}%</div>
-                <div class="output-metric"><strong>Method:</strong> test_generative(x, y)</div>
-                <div class="output-metric"><strong>Issue:</strong> Labels used during inference</div>
-                <div class="output-metric"><strong>Result:</strong> Artificially high accuracy</div>
-            `;
-        }
-        
-        if (cleanOutput) {
-            cleanOutput.innerHTML = `
-                <div class="output-metric"><strong>Epoch:</strong> ${data.epoch + 1}</div>
-                <div class="output-metric"><strong>Accuracy:</strong> ${data.accuracy_realistic.toFixed(2)}%</div>
-                <div class="output-metric"><strong>Method:</strong> test_discriminative(x)</div>
-                <div class="output-metric"><strong>Issue:</strong> None - proper evaluation</div>
-                <div class="output-metric"><strong>Result:</strong> Realistic accuracy for CIFAR-10</div>
-            `;
-        }
-        
-        // Update findings
-        const findingsList = document.getElementById('pcn-findings-list');
-        if (findingsList && data.accuracy_claimed > 90 && data.accuracy_realistic < 60) {
-            findingsList.innerHTML = `
-                <li>With label leakage: ${data.accuracy_claimed.toFixed(1)}% accuracy (matching paper claims)</li>
-                <li>Without label leakage: ${data.accuracy_realistic.toFixed(1)}% accuracy (actual performance)</li>
-                <li>Performance gap: ${(data.accuracy_claimed - data.accuracy_realistic).toFixed(1)}% difference</li>
-                <li>Conclusion: PCN's claimed performance relies on unrealistic test conditions</li>
-            `;
-        }
-    }
-}
-
-function updatePCNExploration(data) {
-    // Update energy chart with both datasets
-    if (typeof updatePCNEnergy === 'function' && data.energy_leaked && data.energy_clean) {
-        updatePCNEnergy(data.energy_leaked, data.energy_clean);
-    }
-    
-    // Update diversity chart with both datasets
-    if (typeof updatePCNDiversity === 'function' && data.diversity_leaked && data.diversity_clean) {
-        updatePCNDiversity(data.diversity_leaked, data.diversity_clean);
-    }
-}
-
-function updateHybridMetrics(data) {
-    // Update loss displays
-    document.getElementById('hybrid-loss').textContent = data.hybrid_loss.toFixed(4);
-    document.getElementById('hybrid-perplexity').textContent = data.hybrid_perplexity.toFixed(2);
-    document.getElementById('baseline-loss').textContent = data.baseline_loss.toFixed(4);
-    document.getElementById('baseline-perplexity').textContent = data.baseline_perplexity.toFixed(2);
-    
-    // Update performance chart
-    if (typeof updateHybridPerformance === 'function') {
-        updateHybridPerformance(data.hybrid_loss, data.baseline_loss);
-    }
-    
-    // Bio-plausibility removed - not meaningful for this project
-}
+// Removed experimental WebSocket handlers
 
 // Initialize WebSocket connection
 function initWebSocket() {
@@ -349,15 +226,8 @@ function initWebSocket() {
                 handleTrainingComplete(data.data);
             } else if (data.type === 'activation_update') {
                 updateActivations(data.data);
-            } else if (data.type === 'pcn_metrics') {
-                updatePCNMetrics(data.data);
-            } else if (data.type === 'pcn_exploration') {
-                updatePCNExploration(data.data);
-            } else if (data.type === 'hybrid_metrics') {
-                updateHybridMetrics(data.data);
-            } else if (data.type === 'multi_lora_metrics') {
-                updateMultiLoRAMetrics(data.data);
             }
+            // Removed experimental message handlers
         } catch (error) {
             console.error('Error parsing WebSocket message:', error);
         }
@@ -970,17 +840,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize dataset handlers
     initDatasetHandlers();
     
-    // Initialize PCN charts on page load
-    if (typeof initPCNCharts === 'function') {
-        initPCNCharts();
-    }
-    
-    // Initialize Multi-LoRA charts
-    if (typeof initMultiLoRACharts === 'function') {
-        initMultiLoRACharts();
-        initMultiLoRAConfig();
-        createTokenHeatmap('token-selection-heatmap');
-    }
+    // Removed experimental initialization code
     
     // Load metrics history
     loadMetricsHistory();
@@ -1316,42 +1176,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
-    // Multi-LoRA training controls
-    document.getElementById('start-multi-lora-training')?.addEventListener('click', async () => {
-        const config = {
-            num_loras: parseInt(document.getElementById('num-loras').value),
-            rank: parseInt(document.getElementById('lora-rank').value),
-            alpha: parseInt(document.getElementById('lora-alpha').value),
-            selection_mode: document.querySelector('input[name="lora-selection-mode"]:checked').value,
-            temperature: parseFloat(document.getElementById('selection-temperature').value),
-            target_modules: Array.from(document.querySelectorAll('#multi-lora-config-panel .checkbox-group input:checked'))
-                .map(cb => cb.value)
-        };
-        
-        try {
-            const response = await fetch('/api/multi-lora/start', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(config)
-            });
-            const result = await response.json();
-            console.log('Multi-LoRA training started:', result);
-        } catch (error) {
-            console.error('Failed to start Multi-LoRA training:', error);
-        }
-    });
-    
-    document.getElementById('stop-multi-lora-training')?.addEventListener('click', async () => {
-        try {
-            const response = await fetch('/api/multi-lora/stop', {
-                method: 'POST'
-            });
-            const result = await response.json();
-            console.log('Multi-LoRA training stopped:', result);
-        } catch (error) {
-            console.error('Failed to stop Multi-LoRA training:', error);
-        }
-    });
+    // Removed Multi-LoRA training controls
     
     // Visualization mode controls
     const visualizationModeCheckbox = document.getElementById('visualization-mode');
