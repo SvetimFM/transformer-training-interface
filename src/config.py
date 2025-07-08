@@ -66,7 +66,7 @@ class TrainingConfig(BaseModel):
     visualization_speed_ratio: float = 0.01  # 1% of normal speed by default
     
     # Optimization settings
-    compile_model: bool = True  # Use torch.compile() for faster training
+    compile_model: bool = False  # Use torch.compile() for faster training (disabled by default to avoid compilation issues)
     compile_mode: str = "default"  # default, reduce-overhead, max-autotune
     use_amp: bool = True  # Use automatic mixed precision
     gradient_accumulation_steps: int = 1  # Number of steps to accumulate gradients
