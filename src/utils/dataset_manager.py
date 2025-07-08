@@ -1,8 +1,8 @@
 import os
 import requests
 from typing import Optional, Tuple
-from ..tokenizers import CharacterTokenizer, BPETokenizer, BaseTokenizer
-from ..config import DatasetConfig
+from tokenizers import CharacterTokenizer, BPETokenizer, BaseTokenizer
+from config import DatasetConfig
 
 
 class DatasetManager:
