@@ -45,7 +45,7 @@ New to transformers? Check out our comprehensive [Transformer Tutorial](docs/TRA
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/SvetimFM/transformer-training-interface.git
 cd transformer-training-interface
 
 # Create a virtual environment
@@ -180,6 +180,6 @@ If you use this project in your research or teaching, please cite:
   title = {Transformer Training Interface},
   author = {[Your Name]},
   year = {2024},
-  url = {https://github.com/yourusername/transformer-training-interface}
+  url = {https://github.com/SvetimFM/transformer-training-interface}
 }
 ```
