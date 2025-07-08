@@ -34,12 +34,24 @@ class AttentionCapture:
         
         # Store head info
         with self._lock:
-            self.head_info[head_id] = {
-                'head_idx': head_idx,
-                'layer_idx': layer_idx,
-                'n_embed': module.n_embed,
-                'head_size': module.head_size
-            }
+            # Check if this is a standard multi-head attention or individual head
+            if hasattr(module, 'n_heads'):
+                # Standard multi-head attention
+                self.head_info[head_id] = {
+                    'head_idx': head_idx,
+                    'layer_idx': layer_idx,
+                    'n_embed': module.n_embed,
+                    'head_size': module.n_embed // module.n_heads,
+                    'n_heads': module.n_heads
+                }
+            else:
+                # Individual attention head
+                self.head_info[head_id] = {
+                    'head_idx': head_idx,
+                    'layer_idx': layer_idx,
+                    'n_embed': module.n_embed,
+                    'head_size': module.head_size
+                }
         
         # Monkey-patch the forward method to capture attention weights
         original_forward = module.forward

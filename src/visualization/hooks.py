@@ -298,7 +298,7 @@ def register_multi_head_attention(mha: nn.Module, name: str, parent_id: str, lay
     """Register multi-head attention and its internal components"""
     
     n_embed = mha.n_embed if hasattr(mha, 'n_embed') else None
-    num_heads = len(mha.heads) if hasattr(mha, 'heads') else 0
+    num_heads = len(mha.heads) if hasattr(mha, 'heads') else (mha.n_heads if hasattr(mha, 'n_heads') else 0)
     
     mha_id = component_registry.register_component(
         mha,
@@ -309,24 +309,26 @@ def register_multi_head_attention(mha: nn.Module, name: str, parent_id: str, lay
         n_embed=n_embed
     )
     
-    # Split operation for Q, K, V
-    split_id = component_registry.register_component(
-        None,
-        "Split to Heads",
-        ComponentType.SPLIT,
-        parent_id=mha_id
-    )
-    
-    # Container for all heads
-    heads_container_id = component_registry.register_component(
-        None,
-        "Attention Heads",
-        ComponentType.ATTENTION,
-        parent_id=split_id
-    )
-    
-    # Register individual attention heads
+    # Check if this is standard attention (single module) or educational (separate heads)
     if hasattr(mha, 'heads'):
+        # Educational implementation with separate heads
+        # Split operation for Q, K, V
+        split_id = component_registry.register_component(
+            None,
+            "Split to Heads",
+            ComponentType.SPLIT,
+            parent_id=mha_id
+        )
+        
+        # Container for all heads
+        heads_container_id = component_registry.register_component(
+            None,
+            "Attention Heads",
+            ComponentType.ATTENTION,
+            parent_id=split_id
+        )
+        
+        # Register individual attention heads
         for i, head in enumerate(mha.heads):
             head_size = head.head_size if hasattr(head, 'head_size') else n_embed // num_heads
             head_id = component_registry.register_component(
@@ -369,6 +371,11 @@ def register_multi_head_attention(mha: nn.Module, name: str, parent_id: str, lay
             
             # Register for attention capture
             attention_capture.register_attention_head(head, head_id, i, layer_idx)
+    else:
+        # Standard implementation - register as a single attention module
+        # For standard attention, we'll capture attention for all heads at once
+        head_id = f"layer_{layer_idx}_attention"
+        attention_capture.register_attention_head(mha, head_id, 0, layer_idx)
     
     # Concatenate heads
     concat_id = component_registry.register_component(
