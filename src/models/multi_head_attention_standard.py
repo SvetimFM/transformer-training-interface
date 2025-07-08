@@ -59,8 +59,9 @@ class MultiHeadAttentionStandard(nn.Module):
         
         # Store attention weights for visualization if requested
         if return_attention:
-            # Average attention weights across heads for visualization
-            attention_weights = attn_weights.mean(dim=1)  # (B, T, T)
+            # Return all heads' attention weights for visualization
+            # Shape: (B, n_heads, T, T)
+            attention_weights = attn_weights.clone()
         
         # Apply dropout
         attn_weights = self.attn_dropout(attn_weights)

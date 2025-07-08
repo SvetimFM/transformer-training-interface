@@ -62,8 +62,24 @@ class AttentionCapture:
                 out, attention_weights = original_forward(x, return_attention=True)
                 
                 with self._lock:
-                    # Store attention weights (B, T, T)
-                    self.attention_weights[head_id] = attention_weights.detach()
+                    # Check if this is multi-head attention with multiple heads
+                    if hasattr(module, 'n_heads') and attention_weights.dim() == 4:
+                        # Standard multi-head attention returns (B, n_heads, T, T)
+                        # Split into individual heads
+                        B, n_heads, T, _ = attention_weights.shape
+                        for i in range(n_heads):
+                            individual_head_id = f"{head_id}_head_{i}"
+                            self.attention_weights[individual_head_id] = attention_weights[:, i, :, :].detach()
+                            # Also store head info for each individual head
+                            self.head_info[individual_head_id] = {
+                                'head_idx': i,
+                                'layer_idx': layer_idx,
+                                'n_embed': module.n_embed,
+                                'head_size': module.n_embed // module.n_heads
+                            }
+                    else:
+                        # Individual attention head or averaged weights
+                        self.attention_weights[head_id] = attention_weights.detach()
                 
                 if return_attention:
                     return out, attention_weights
