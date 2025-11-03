@@ -21,6 +21,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 from diagnostics.core.topology_detector import TopologyDetector
 from diagnostics.core.compute_profiler import ComputeProfiler
 from diagnostics.core.multi_gpu_profiler import MultiGPUProfiler
+from diagnostics.core.nccl_profiler import NCCLProfiler
 from diagnostics.core.metrics import TestMode
 from diagnostics.cli import DiagnosticsCLI
 
@@ -183,6 +184,75 @@ async def run_multi_gpu_benchmark(mode: str):
                 "error": str(e),
                 "message": "Multi-GPU benchmark failed"
             }
+
+
+@app.post("/api/benchmark/nccl/{mode}")
+async def run_nccl_benchmark(mode: str):
+    """
+    Run NCCL communication benchmarks.
+
+    Args:
+        mode: "quick" or "deep"
+
+    Note: Requires at least 2 GPUs. Tests inter-GPU communication
+    bandwidth for All-Reduce, Broadcast, and Point-to-Point transfers.
+    """
+    import time
+    import torch
+
+    test_mode = TestMode.QUICK if mode == "quick" else TestMode.DEEP
+
+    # Check GPU count
+    if not torch.cuda.is_available():
+        return {
+            "status": "error",
+            "error": "CUDA not available",
+            "message": "NCCL benchmarks require CUDA support"
+        }
+
+    gpu_count = torch.cuda.device_count()
+    if gpu_count < 2:
+        return {
+            "status": "error",
+            "error": "Insufficient GPUs",
+            "message": f"NCCL tests require at least 2 GPUs, found {gpu_count}"
+        }
+
+    try:
+        # Run NCCL benchmark
+        start_time = time.time()
+        profiler = NCCLProfiler()
+        result = profiler.run(mode=test_mode)
+        elapsed = time.time() - start_time
+
+        return {
+            "status": "complete" if result.status.value == "passed" else "failed",
+            "mode": mode,
+            "duration_seconds": round(elapsed, 1),
+            "result": {
+                "test_name": result.test_name,
+                "status": result.status.value,
+                "metrics": result.metrics,
+                "interpretation": result.interpretation
+            },
+            "summary": {
+                "num_gpus": result.metrics.get("num_gpus", 0),
+                "all_reduce_bandwidth_gbps": result.metrics.get("all_reduce_peak_bandwidth_gbps", 0),
+                "point_to_point_bandwidth_gbps": result.metrics.get("point_to_point_peak_bandwidth_gbps", 0)
+            }
+        }
+    except RuntimeError as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "message": "NCCL benchmark failed - check logs"
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "message": "Unexpected error during NCCL benchmark"
+        }
 
 
 @app.get("/api/report/download")

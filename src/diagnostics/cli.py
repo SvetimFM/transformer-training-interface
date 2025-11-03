@@ -27,6 +27,7 @@ from diagnostics.core.backend_detector import BackendDetector, ComputeBackend
 from diagnostics.core.cpu_profiler import CPUProfiler
 from diagnostics.core.health_monitor import GPUHealthMonitor
 from diagnostics.core.burn_in import BurnInTester
+from diagnostics.core.nccl_profiler import NCCLProfiler
 
 
 class DiagnosticsCLI:
@@ -161,10 +162,33 @@ class DiagnosticsCLI:
 
             print()
 
-        # Test 5: Burn-in Testing (Burn-in mode only)
+        # Test 5: NCCL Communication Testing (Multi-GPU only, Deep/Burn-in modes)
+        if mode in [TestMode.DEEP, TestMode.BURN_IN] and torch.cuda.device_count() >= 2:
+            print("=" * 80)
+            print("5. NCCL COMMUNICATION PROFILING")
+            print("=" * 80)
+            print(f"Testing inter-GPU communication on {torch.cuda.device_count()} GPUs...")
+            print("Measuring All-Reduce, Broadcast, and Point-to-Point bandwidth.")
+            print()
+
+            try:
+                profiler = NCCLProfiler()
+                result = self._run_test(profiler, mode)
+                self.suite.add_result(result)
+                result.print_summary(verbose=False)
+            except RuntimeError as e:
+                print(f"  ⚠️  NCCL profiling skipped: {e}")
+            except Exception as e:
+                print(f"  ⚠️  NCCL profiling failed: {e}")
+                import traceback
+                traceback.print_exc()
+
+            print()
+
+        # Test 6: Burn-in Testing (Burn-in mode only)
         if mode == TestMode.BURN_IN:
             print("=" * 80)
-            print("5. BURN-IN TESTING")
+            print("6. BURN-IN TESTING")
             print("=" * 80)
             print(f"Running {self.burn_in_duration:.1f} hour stability test...")
             print("This test validates hardware stability under sustained load.")
@@ -192,9 +216,6 @@ class DiagnosticsCLI:
                 health_monitor.cleanup()
             except:
                 pass
-
-        # TODO: Add more tests
-        # - NCCL Profiler (multi-GPU)
 
         # Print summary
         self._print_summary()
